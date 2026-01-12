@@ -8,6 +8,10 @@ import {
   capiPurchase,
 } from '@/lib/facebook-capi';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 /**
  * POST /api/facebook/capi
  * Proxy endpoint to send events to Facebook Conversions API

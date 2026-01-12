@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { verifyAndGetClinic } from '@/lib/license';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Validation schema
 const createCampaignSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),

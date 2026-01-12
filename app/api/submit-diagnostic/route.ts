@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Zod schema for validation
 const diagnosticSchema = z.object({
   totalPatients: z.number().min(1, 'Total de pacientes deve ser no mínimo 1'),

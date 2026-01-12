@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyLicense } from '@/lib/license';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Validation schema
 const verifyLicenseSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),

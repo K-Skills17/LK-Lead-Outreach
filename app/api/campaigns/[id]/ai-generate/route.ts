@@ -4,6 +4,10 @@ import OpenAI from 'openai';
 import { verifyAndGetClinic } from '@/lib/license';
 import { verifyCampaignOwnership, getAIUsageToday, incrementAIUsage } from '@/lib/campaigns';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,

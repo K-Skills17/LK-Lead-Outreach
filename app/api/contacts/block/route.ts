@@ -4,6 +4,10 @@ import { verifyAndGetClinic } from '@/lib/license';
 import { normalizePhone } from '@/lib/phone';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Validation schema
 const blockContactSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),

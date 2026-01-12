@@ -5,6 +5,10 @@ import { verifyCampaignOwnership, isPhoneBlocked, isPhoneInCampaign } from '@/li
 import { normalizePhone } from '@/lib/phone';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Validation schema
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
