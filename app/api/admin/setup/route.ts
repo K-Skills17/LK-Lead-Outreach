@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { hashPassword } from '@/lib/auth';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 /**
  * POST /api/admin/setup
  * One-time setup to create admin user with hashed password

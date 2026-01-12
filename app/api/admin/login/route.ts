@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyPassword, generateSessionToken } from '@/lib/auth';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 /**
  * POST /api/admin/login
  * Admin login with email and password
