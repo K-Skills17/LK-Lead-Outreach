@@ -1,0 +1,7 @@
+# .cursorrules
+- Framework: Next.js 14+ (App Router), Typescript, Tailwind CSS.
+- Style: "Medical Fintech" aesthetic. Clean, large fonts, whites, blues (#2563EB), and Slate grays.
+- Architecture: Client-side logic for the calculator. API Routes for external webhooks.
+- Tooling: Use 'lucide-react' for icons, 'zod' for validation, 'react-hook-form' for inputs.
+- Constraints: NO DATABASE setup (Prisma/Supabase) yet. Use the provided API route structure to send data to Make.com.
+- Language: Portuguese (PT-BR) ONLY for UI text.
