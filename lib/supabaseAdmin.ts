@@ -9,25 +9,55 @@
  * const { data, error } = await supabaseAdmin.from('campaigns').select();
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Get environment variables (safe during build)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+let supabaseAdminInstance: SupabaseClient | null = null;
 
 /**
- * Supabase Admin Client
+ * Get Supabase Admin Client (lazy-loaded)
  * 
  * Uses service-role key to bypass Row Level Security (RLS)
  * and access all tables directly. Only use on server-side.
  * 
- * Note: During build time, env vars may not be available.
- * The client will be created but will fail at runtime if vars are missing.
+ * Creates the client on first use (not at module load time)
+ * to avoid build-time errors when env vars are missing.
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+function getSupabaseAdmin(): SupabaseClient {
+  if (supabaseAdminInstance) {
+    return supabaseAdminInstance;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error(
+      'Missing Supabase environment variables. ' +
+      'Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY'
+    );
+  }
+
+  supabaseAdminInstance = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseAdminInstance;
+}
+
+/**
+ * Supabase Admin Client
+ * 
+ * Use this in your API routes and server-side code.
+ * It will be lazily initialized on first access.
+ */
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getSupabaseAdmin();
+    const value = client[prop as keyof SupabaseClient];
+    return typeof value === 'function' ? value.bind(client) : value;
   },
 });
 
