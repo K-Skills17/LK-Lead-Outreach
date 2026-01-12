@@ -11,23 +11,18 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Validate environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
-}
-
-if (!supabaseServiceRoleKey) {
-  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
-}
+// Get environment variables (safe during build)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 /**
  * Supabase Admin Client
  * 
  * Uses service-role key to bypass Row Level Security (RLS)
  * and access all tables directly. Only use on server-side.
+ * 
+ * Note: During build time, env vars may not be available.
+ * The client will be created but will fail at runtime if vars are missing.
  */
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
