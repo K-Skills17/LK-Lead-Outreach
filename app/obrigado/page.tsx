@@ -33,11 +33,11 @@ export default function ObrigadoPage() {
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 inline-block">
             <div className="flex items-center gap-3 justify-center mb-3">
               <Crown className="w-8 h-8 text-yellow-300" />
-              <span className="text-2xl sm:text-3xl font-bold">7 DIAS DE PREMIUM GRÁTIS</span>
+              <span className="text-2xl sm:text-3xl font-bold">14 DIAS DE PREMIUM GRÁTIS</span>
               <Crown className="w-8 h-8 text-yellow-300" />
             </div>
             <p className="text-lg text-white/90">
-              Você acabou de desbloquear todos os recursos por 1 semana!
+              Você acabou de desbloquear todos os recursos por 2 semanas!
             </p>
           </div>
         </div>
@@ -51,7 +51,7 @@ export default function ObrigadoPage() {
               ✨ O que você tem acesso agora
             </h2>
             <p className="text-gray-600">
-              Todos os recursos PREMIUM desbloqueados pelos próximos 7 dias
+              Todos os recursos PREMIUM desbloqueados pelos próximos 14 dias
             </p>
           </div>
 
@@ -148,7 +148,7 @@ export default function ObrigadoPage() {
               <div>
                 <h3 className="font-bold text-gray-900 mb-1">Copie sua Chave de Licença</h3>
                 <p className="text-sm text-gray-700">
-                  Sua chave foi enviada por email. Cole no app para ativar os 7 dias Premium.
+                  Sua chave foi enviada por email. Cole no app para ativar os 14 dias Premium.
                 </p>
               </div>
             </div>
