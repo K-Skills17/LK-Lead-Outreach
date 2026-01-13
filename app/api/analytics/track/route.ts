@@ -38,51 +38,90 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'lead_started':
-        await supabaseAdmin.from('leads').insert({
-          session_id: sessionId,
-          status: 'started',
-          abandoned_at_step: 1,
-        });
+        // Check if lead already exists for this session
+        const { data: existingLeadStarted } = await supabaseAdmin
+          .from('leads')
+          .select('id')
+          .eq('session_id', sessionId)
+          .single();
+
+        if (!existingLeadStarted) {
+          // Only insert if not exists
+          await supabaseAdmin.from('leads').insert({
+            session_id: sessionId,
+            status: 'started',
+            abandoned_at_step: 1,
+          });
+        }
         break;
 
       case 'lead_step1':
-        await supabaseAdmin.from('leads').upsert({
-          session_id: sessionId,
-          total_patients: data.totalPatients,
-          ticket_medio: data.ticketMedio,
-          inactive_percent: data.inactivePercent,
-          lost_revenue: data.lostRevenue,
-          status: 'step1',
-          abandoned_at_step: 1,
-        });
+        // Check if lead exists for this session
+        const { data: existingLead1 } = await supabaseAdmin
+          .from('leads')
+          .select('id')
+          .eq('session_id', sessionId)
+          .single();
+
+        if (existingLead1) {
+          // Update existing lead
+          await supabaseAdmin
+            .from('leads')
+            .update({
+              total_patients: data.totalPatients,
+              ticket_medio: data.ticketMedio,
+              inactive_percent: data.inactivePercent,
+              lost_revenue: data.lostRevenue,
+              status: 'step1',
+              abandoned_at_step: 1,
+            })
+            .eq('session_id', sessionId);
+        } else {
+          // Insert new lead
+          await supabaseAdmin.from('leads').insert({
+            session_id: sessionId,
+            total_patients: data.totalPatients,
+            ticket_medio: data.ticketMedio,
+            inactive_percent: data.inactivePercent,
+            lost_revenue: data.lostRevenue,
+            status: 'step1',
+            abandoned_at_step: 1,
+          });
+        }
         break;
 
       case 'lead_step2':
-        await supabaseAdmin.from('leads').upsert({
-          session_id: sessionId,
-          clinic_name: data.clinicName,
-          name: data.name,
-          email: data.email,
-          whatsapp: data.whatsapp,
-          status: 'step2',
-          abandoned_at_step: 2,
-        });
+        // Update existing lead (should always exist after step1)
+        await supabaseAdmin
+          .from('leads')
+          .update({
+            clinic_name: data.clinicName,
+            name: data.name,
+            email: data.email,
+            whatsapp: data.whatsapp,
+            status: 'step2',
+            abandoned_at_step: 2,
+          })
+          .eq('session_id', sessionId);
         break;
 
       case 'lead_completed':
-        await supabaseAdmin.from('leads').upsert({
-          session_id: sessionId,
-          clinic_name: data.clinicName,
-          name: data.name,
-          email: data.email,
-          whatsapp: data.whatsapp,
-          total_patients: data.totalPatients,
-          ticket_medio: data.ticketMedio,
-          inactive_percent: data.inactivePercent,
-          lost_revenue: data.lostRevenue,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        });
+        // Update existing lead with all data and mark as completed
+        await supabaseAdmin
+          .from('leads')
+          .update({
+            clinic_name: data.clinicName,
+            name: data.name,
+            email: data.email,
+            whatsapp: data.whatsapp,
+            total_patients: data.totalPatients,
+            ticket_medio: data.ticketMedio,
+            inactive_percent: data.inactivePercent,
+            lost_revenue: data.lostRevenue,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('session_id', sessionId);
         break;
 
       case 'download':
