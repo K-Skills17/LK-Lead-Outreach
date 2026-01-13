@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPaidLicenseEmail } from '@/lib/email-service';
 
 export async function POST(request: Request) {
   try {
@@ -118,8 +119,23 @@ export async function POST(request: Request) {
       period_end: periodEnd.toISOString()
     });
     
-    // TODO: Send activation email to clinic.email
-    // await sendActivationEmail(clinic.email, clinic.name, tier, licenseKey);
+    // ✨ Send activation email with license key
+    try {
+      await sendPaidLicenseEmail({
+        name: clinic.name || clinic.clinic_name || 'Cliente',
+        email: clinic.email,
+        clinicName: clinic.clinic_name || clinic.name || 'Clínica',
+        licenseKey: clinic.license_key,
+        tier: tier as 'PRO' | 'PREMIUM',
+        amount: amount,
+        billingCycle: billingCycle,
+        paymentId: paymentId
+      });
+      console.log(`✅ Activation email sent to: ${clinic.email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send activation email:', emailError);
+      // Don't fail the webhook if email fails - subscription is already activated
+    }
     
     return NextResponse.json({ 
       received: true, 

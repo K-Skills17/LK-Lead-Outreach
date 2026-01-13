@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import crypto from 'crypto';
+import { generateLicenseKey } from '@/lib/license-utils';
 
 export async function POST(request: Request) {
   try {
@@ -94,12 +94,6 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
-
-function generateLicenseKey(): string {
-  const prefix = 'LKRP';
-  const randomBytes = crypto.randomBytes(6).toString('hex').toUpperCase();
-  return `${prefix}-${randomBytes.substring(0,4)}-${randomBytes.substring(4,8)}-${randomBytes.substring(8,12)}`;
 }
 
 function getSubscriptionAmount(plan: string, cycle: string): number {

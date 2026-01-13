@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { generateLicenseKey } from '@/lib/license-utils';
+import { sendFreeLicenseEmail } from '@/lib/email-service';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -122,6 +124,80 @@ export async function POST(request: NextRequest) {
             completed_at: new Date().toISOString(),
           })
           .eq('session_id', sessionId);
+
+        // ✨ NEW: Generate license key and create FREE account
+        try {
+          // Check if clinic already exists for this email
+          const { data: existingClinic } = await supabaseAdmin
+            .from('clinics')
+            .select('id, license_key, email')
+            .eq('email', data.email)
+            .single();
+
+          if (!existingClinic) {
+            // Generate unique license key
+            const licenseKey = generateLicenseKey();
+            
+            // Create clinic with FREE tier (14-day trial)
+            const { data: newClinic, error: clinicError } = await supabaseAdmin
+              .from('clinics')
+              .insert({
+                name: data.name,
+                email: data.email,
+                phone: data.whatsapp,
+                clinic_name: data.clinicName,
+                license_key: licenseKey,
+                tier: 'FREE',
+                verified_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            if (clinicError) {
+              console.error('❌ Error creating clinic:', clinicError);
+            } else if (newClinic) {
+              console.log(`✅ Clinic created: ${newClinic.id} (${data.email})`);
+
+              // Create FREE subscription (14-day trial)
+              const trialEndDate = new Date();
+              trialEndDate.setDate(trialEndDate.getDate() + 14); // 14 days from now
+
+              await supabaseAdmin
+                .from('subscriptions')
+                .insert({
+                  clinic_id: newClinic.id,
+                  tier: 'FREE',
+                  status: 'active',
+                  billing_cycle: 'trial',
+                  amount: 0,
+                  current_period_start: new Date().toISOString(),
+                  current_period_end: trialEndDate.toISOString()
+                });
+
+              console.log(`✅ FREE subscription created for clinic: ${newClinic.id}`);
+
+              // ✨ Send welcome email with license key
+              try {
+                await sendFreeLicenseEmail({
+                  name: data.name,
+                  email: data.email,
+                  clinicName: data.clinicName,
+                  licenseKey: licenseKey,
+                  whatsapp: data.whatsapp
+                });
+                console.log(`✅ Welcome email sent to: ${data.email}`);
+              } catch (emailError) {
+                console.error('❌ Error sending welcome email:', emailError);
+                // Don't fail the whole process if email fails
+              }
+            }
+          } else {
+            console.log(`ℹ️ Clinic already exists for email: ${data.email}`);
+          }
+        } catch (error) {
+          console.error('❌ Error in lead completion flow:', error);
+          // Don't fail the tracking if clinic/email fails
+        }
         break;
 
       case 'download':
