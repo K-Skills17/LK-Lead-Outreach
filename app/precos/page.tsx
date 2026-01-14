@@ -160,8 +160,8 @@ function PricingContent() {
               }`}
             >
               Anual
-              <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-white text-xs rounded-full">
-                -10%
+              <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-white text-xs rounded-full whitespace-nowrap">
+                até 33% de desconto
               </span>
             </button>
           </div>
