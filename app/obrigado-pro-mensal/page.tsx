@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
+import { Footer } from '@/components/ui/footer';
 
 export default function ObrigadoProMensalPage() {
   return (
@@ -233,6 +234,7 @@ export default function ObrigadoProMensalPage() {
           </p>
         </section>
       </div>
+      <Footer />
     </main>
   );
 }

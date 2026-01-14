@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
+import { Footer } from '@/components/ui/footer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { trackDownload, trackTrialActivated } from '@/lib/analytics';
@@ -222,6 +223,7 @@ function ThankYouContent() {
           </p>
         </section>
       </div>
+      <Footer />
     </main>
   );
 }

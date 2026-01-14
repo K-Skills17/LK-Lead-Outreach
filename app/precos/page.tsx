@@ -121,9 +121,9 @@ function PricingContent() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 md:pt-32 lg:pt-36 pb-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-40 md:pt-44 lg:pt-48 pb-12">
         <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-10">
             <Sparkles className="w-4 h-4" />
             Sem taxa por mensagem • Sem WhatsApp API • Sem contratos longos
           </div>
@@ -407,52 +407,7 @@ function PricingContent() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-bold text-slate-900">LK Reactor</span>
-              </div>
-              <p className="text-sm text-slate-600">
-                Reative pacientes com inteligência e controle.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-slate-900 mb-3">Produto</h4>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li><Link href="/#recursos" className="hover:text-blue-600">Recursos</Link></li>
-                <li><Link href="/precos" className="hover:text-blue-600">Preços</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-slate-900 mb-3">Suporte</h4>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li><a href="https://wa.me/5511952829271" className="hover:text-blue-600" target="_blank" rel="noopener noreferrer">WhatsApp: +55 11 95282-9271</a></li>
-                <li><a href="mailto:contato@lkdigital.org" className="hover:text-blue-600">contato@lkdigital.org</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-slate-900 mb-3">Legal</h4>
-              <ul className="space-y-2 text-sm text-slate-600">
-                <li><Link href="/termos" className="hover:text-blue-600">Termos de Uso</Link></li>
-                <li><Link href="/privacidade" className="hover:text-blue-600">Privacidade</Link></li>
-                <li><Link href="/lgpd" className="hover:text-blue-600">LGPD</Link></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="mt-8 pt-8 border-t border-slate-200 text-center text-sm text-slate-600">
-            © 2026 46 337 446 STEPHEN DOMINGOS DOMINGOS. Todos os direitos reservados.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
