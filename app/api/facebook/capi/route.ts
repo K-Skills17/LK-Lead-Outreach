@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || '';
     const ipAddress = request.headers.get('x-forwarded-for') || 
                      request.headers.get('x-real-ip') || 
-                     request.ip ||
                      '';
     const cookies = request.headers.get('cookie') || '';
 
