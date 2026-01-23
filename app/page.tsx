@@ -177,7 +177,10 @@ export default function Home() {
   useEffect(() => {
     if (currentStep === 3 && !isSubmitting) {
       submitDiagnostic();
-      trackLeadCompleted(formData);
+      trackLeadCompleted({
+        ...formData,
+        lostRevenue,
+      });
     }
   }, [currentStep]);
 
