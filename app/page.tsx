@@ -27,6 +27,14 @@ import {
 } from '@/components/ui/wizard';
 import { SimpleNavbar } from '@/components/ui/navbar';
 import Link from 'next/link';
+import { fbLead, fbViewContent } from '@/lib/facebook-pixel';
+import { 
+  trackPageView, 
+  trackLeadStarted, 
+  trackLeadStep1, 
+  trackLeadStep2, 
+  trackLeadCompleted 
+} from '@/lib/analytics';
 
 interface FormData {
   totalPatients: number;
@@ -63,6 +71,18 @@ export default function Home() {
   const [errors, setErrors] = useState<FormErrors>({});
 
   const totalSteps = 3;
+
+  // Track page view on mount
+  useEffect(() => {
+    trackPageView('/');
+  }, []);
+
+  // Track lead started when user starts filling form
+  useEffect(() => {
+    if (currentStep === 1 && (formData.totalPatients > 0 || formData.ticketMedio > 0)) {
+      trackLeadStarted();
+    }
+  }, [currentStep, formData.totalPatients, formData.ticketMedio]);
 
   // Calculate lost revenue
   const lostRevenue =
@@ -120,8 +140,29 @@ export default function Home() {
 
   // Navigation handlers
   const handleNext = () => {
-    if (currentStep === 1 && !validateStep1()) return;
-    if (currentStep === 2 && !validateStep2()) return;
+    if (currentStep === 1) {
+      if (!validateStep1()) return;
+      trackLeadStep1({
+        totalPatients: formData.totalPatients,
+        ticketMedio: formData.ticketMedio,
+        inactivePercent: formData.inactivePercent,
+        lostRevenue,
+      });
+    }
+    
+    if (currentStep === 2) {
+      if (!validateStep2()) return;
+      
+      trackLeadStep2({
+        clinicName: formData.clinicName,
+        name: formData.name,
+        email: formData.email,
+        whatsapp: formData.whatsapp,
+      });
+
+      // Track Lead on Facebook Pixel (Browser)
+      fbLead('Lead Form');
+    }
 
     setDirection('forward');
     setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
@@ -136,6 +177,7 @@ export default function Home() {
   useEffect(() => {
     if (currentStep === 3 && !isSubmitting) {
       submitDiagnostic();
+      trackLeadCompleted(formData);
     }
   }, [currentStep]);
 
@@ -165,8 +207,9 @@ export default function Home() {
   return (
     <>
       <SimpleNavbar />
-      <WizardContainer>
-        <WizardProgress currentStep={currentStep} totalSteps={totalSteps} />
+      <main>
+        <WizardContainer>
+          <WizardProgress currentStep={currentStep} totalSteps={totalSteps} />
 
       <AnimatePresence mode="wait">
         {/* Step 1: Diagnostic Inputs */}
@@ -189,6 +232,7 @@ export default function Home() {
             </div>
 
             <NumberInput
+              id="totalPatients"
               label="Total de Pacientes"
               value={formData.totalPatients || ''}
               onChange={(e) =>
@@ -206,6 +250,7 @@ export default function Home() {
             />
 
             <CurrencyInput
+              id="ticketMedio"
               label="Ticket Médio"
               value={formData.ticketMedio}
               onChange={(value) =>
@@ -217,6 +262,7 @@ export default function Home() {
             />
 
             <SliderInput
+              id="inactivePercent"
               label="Percentual de Pacientes Inativos"
               value={formData.inactivePercent}
               onChange={(value) =>
@@ -256,6 +302,7 @@ export default function Home() {
             </div>
 
             <TextInput
+              id="clinicName"
               label="Nome da Clínica"
               value={formData.clinicName}
               onChange={(e) =>
@@ -268,6 +315,7 @@ export default function Home() {
             />
 
             <TextInput
+              id="name"
               label="Nome Completo"
               value={formData.name}
               onChange={(e) =>
@@ -280,6 +328,7 @@ export default function Home() {
             />
 
             <PhoneInput
+              id="whatsapp"
               label="WhatsApp"
               value={formData.whatsapp}
               onChange={(value) =>
@@ -291,6 +340,7 @@ export default function Home() {
             />
 
             <EmailInput
+              id="email"
               label="Email"
               value={formData.email}
               onChange={(e) =>
@@ -409,6 +459,7 @@ export default function Home() {
         )}
       </AnimatePresence>
     </WizardContainer>
-    </>
+      </main>
+      </>
   );
 }

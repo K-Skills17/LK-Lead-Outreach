@@ -1,8 +1,16 @@
+'use client';
+
 import { Clock, Mail, ArrowRight, RefreshCcw } from 'lucide-react';
 import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
+import { useEffect } from 'react';
+import { trackPageView } from '@/lib/analytics';
 
 export default function PagamentoPendentePage() {
+  useEffect(() => {
+    trackPageView('/pagamento-pendente');
+  }, []);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-amber-50">
       <SimpleNavbar />

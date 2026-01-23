@@ -164,11 +164,11 @@ export async function sendEventToCAPI(
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('[CAPI] Error response:', result);
+      console.error('[CAPI] Error response:', JSON.stringify(result, null, 2));
       return false;
     }
 
-    console.log('[CAPI] Event sent successfully:', eventName, 'Event ID:', eventId);
+    console.log('[CAPI] Event sent successfully:', eventName, 'Event ID:', eventId, 'Result:', JSON.stringify(result, null, 2));
     return true;
   } catch (error) {
     console.error('[CAPI] Error sending event:', error);

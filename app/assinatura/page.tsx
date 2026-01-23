@@ -16,10 +16,15 @@ import {
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
+import { trackPageView } from '@/lib/analytics';
 
 function SubscriptionManagementContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  useEffect(() => {
+    trackPageView('/assinatura');
+  }, []);
   
   const [email, setEmail] = useState(searchParams.get('email') || '');
   const [licenseKey, setLicenseKey] = useState(searchParams.get('license_key') || '');

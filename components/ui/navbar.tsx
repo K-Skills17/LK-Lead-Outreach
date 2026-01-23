@@ -19,6 +19,7 @@ export function Navbar() {
 
   return (
     <header 
+      role="banner"
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled 
           ? 'bg-white/95 backdrop-blur-xl shadow-lg border-b border-gray-100' 
@@ -104,7 +105,7 @@ export function Navbar() {
 
 export function SimpleNavbar() {
   return (
-    <header className="bg-white/95 backdrop-blur-xl border-b border-gray-100 py-4 sm:py-5 md:py-6 px-4 shadow-sm">
+    <header role="banner" className="bg-white/95 backdrop-blur-xl border-b border-gray-100 py-4 sm:py-5 md:py-6 px-4 shadow-sm">
       <div className="max-w-4xl mx-auto flex items-center justify-center">
         <Link href="/" className="relative hover:opacity-90 transition-opacity h-16 sm:h-20 md:h-24">
           <Image

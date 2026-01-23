@@ -18,7 +18,8 @@ import { SimpleNavbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { trackDownload, trackTrialActivated } from '@/lib/analytics';
+import { trackDownload, trackTrialActivated, trackPageView } from '@/lib/analytics';
+import { fbCompleteRegistration } from '@/lib/facebook-pixel';
 
 function ThankYouContent() {
   const searchParams = useSearchParams();
@@ -28,9 +29,14 @@ function ThankYouContent() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
+    trackPageView('/obrigado');
+    
     if (initialEmail) {
       // Trigger trial activation email tracking
       trackTrialActivated(initialEmail);
+      
+      // Track CompleteRegistration on Facebook Pixel (Browser)
+      fbCompleteRegistration('free', 0);
     }
   }, [initialEmail]);
 

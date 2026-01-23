@@ -126,8 +126,8 @@ export function WizardButton({
 }: WizardButtonProps) {
   const baseClasses = 'w-full h-14 rounded-xl font-semibold text-base transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg';
   const variantClasses = variant === 'primary'
-    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100'
-    : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]';
+    ? 'bg-gradient-to-r from-emerald-700 to-teal-700 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100'
+    : 'bg-white text-gray-800 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]';
 
   return (
     <motion.button
@@ -158,13 +158,14 @@ interface NumberInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  id: string;
 }
 
 export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ label, error, helperText, icon, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, id, className = '', ...props }, ref) => {
     return (
       <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800 mb-2.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -176,6 +177,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
           )}
           <input
             ref={ref}
+            id={id}
             type="number"
             className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
@@ -208,11 +210,12 @@ interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  id: string;
   onChange?: (value: number) => void;
 }
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ label, error, helperText, icon, onChange, value, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, id, onChange, value, className = '', ...props }, ref) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const numbers = e.target.value.replace(/\D/g, '');
       const amount = parseFloat(numbers) / 100;
@@ -230,7 +233,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 
     return (
       <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800 mb-2.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -240,6 +243,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           </div>
           <input
             ref={ref}
+            id={id}
             type="text"
             value={displayValue}
             onChange={handleChange}
@@ -278,6 +282,7 @@ interface SliderInputProps {
   max?: number;
   step?: number;
   helperText?: string;
+  id: string;
 }
 
 export function SliderInput({
@@ -288,11 +293,12 @@ export function SliderInput({
   max = 100,
   step = 1,
   helperText,
+  id,
 }: SliderInputProps) {
   return (
     <div className="mb-6">
       <div className="flex justify-between items-center mb-4">
-        <label className="block text-sm font-semibold text-gray-800">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800">
           {label}
         </label>
         <div className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xl font-bold rounded-xl shadow-lg">
@@ -301,6 +307,7 @@ export function SliderInput({
       </div>
       <div className="relative">
         <input
+          id={id}
           type="range"
           min={min}
           max={max}
@@ -358,11 +365,12 @@ interface PhoneInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 't
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  id: string;
   onChange?: (value: string) => void;
 }
 
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
-  ({ label, error, helperText, icon, onChange, value, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, id, onChange, value, className = '', ...props }, ref) => {
     const formatPhoneNumber = (val: string) => {
       const numbers = val.replace(/\D/g, '');
       
@@ -389,7 +397,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
 
     return (
       <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800 mb-2.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -401,6 +409,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
           )}
           <input
             ref={ref}
+            id={id}
             type="tel"
             value={value}
             onChange={handleChange}
@@ -436,13 +445,14 @@ interface EmailInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 't
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  id: string;
 }
 
 export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
-  ({ label, error, helperText, icon, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, id, className = '', ...props }, ref) => {
     return (
       <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800 mb-2.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -454,6 +464,7 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
           )}
           <input
             ref={ref}
+            id={id}
             type="email"
             className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
@@ -486,13 +497,14 @@ interface TextInputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   helperText?: string;
   icon?: React.ReactNode;
+  id: string;
 }
 
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
-  ({ label, error, helperText, icon, className = '', ...props }, ref) => {
+  ({ label, error, helperText, icon, id, className = '', ...props }, ref) => {
     return (
       <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+        <label htmlFor={id} className="block text-sm font-semibold text-gray-800 mb-2.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -504,6 +516,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
           )}
           <input
             ref={ref}
+            id={id}
             type="text"
             className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'

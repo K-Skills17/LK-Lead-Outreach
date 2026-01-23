@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { capiLead } from '@/lib/facebook-capi';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -34,33 +35,45 @@ export async function POST(request: NextRequest) {
     // Get webhook URL from environment
     const webhookUrl = process.env.MAKE_WEBHOOK_URL;
 
-    if (!webhookUrl) {
-      console.error('MAKE_WEBHOOK_URL not configured');
-      // Don't block user experience if webhook is not configured
-      return NextResponse.json({
-        success: true,
-        message: 'Diagnóstico enviado com sucesso',
-      });
-    }
-
-    // Send to Make.com webhook
-    try {
-      const webhookResponse = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!webhookResponse.ok) {
-        console.error('Webhook error:', webhookResponse.statusText);
-        // Don't block user experience even if webhook fails
+    // Send to Make.com webhook and Facebook CAPI in parallel
+    const webhookPromise = (async () => {
+      if (!webhookUrl) return;
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (e) {
+        console.error('Webhook error:', e);
       }
-    } catch (webhookError) {
-      console.error('Failed to send to webhook:', webhookError);
-      // Don't block user experience even if webhook fails
-    }
+    })();
+
+    const capiPromise = (async () => {
+      try {
+        const url = request.headers.get('referer') || request.url;
+        const userAgent = request.headers.get('user-agent') || '';
+        const ipAddress = request.headers.get('x-forwarded-for') || 
+                         request.headers.get('x-real-ip') || 
+                         '';
+        const cookies = request.headers.get('cookie') || '';
+
+        await capiLead(
+          url,
+          userAgent,
+          ipAddress,
+          cookies,
+          validatedData.email,
+          validatedData.whatsapp,
+          validatedData.name.split(' ')[0]
+        );
+      } catch (e) {
+        console.error('CAPI error:', e);
+      }
+    })();
+
+    // Use Promise.all to run both in parallel
+    await Promise.all([webhookPromise, capiPromise]);
 
     // Always return success to user
     return NextResponse.json({

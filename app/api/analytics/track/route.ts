@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { generateLicenseKey } from '@/lib/license-utils';
 import { sendFreeLicenseEmail } from '@/lib/email-service';
+import { capiCompleteRegistration } from '@/lib/facebook-capi';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -234,6 +235,24 @@ export async function POST(request: NextRequest) {
           event_value: 0,
           event_data: { plan_type: 'free' },
         });
+
+        // ✨ NEW: Send to Facebook CAPI
+        try {
+          const url = request.headers.get('referer') || request.url;
+          const cookies = request.headers.get('cookie') || '';
+          
+          await capiCompleteRegistration(
+            url,
+            userAgent,
+            ip,
+            cookies,
+            'free',
+            0,
+            data.email
+          );
+        } catch (capiError) {
+          console.error('Failed to send CompleteRegistration to Facebook CAPI:', capiError);
+        }
         break;
 
       case 'download':

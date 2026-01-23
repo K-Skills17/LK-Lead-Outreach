@@ -6,11 +6,19 @@ import Link from 'next/link';
 import { Navbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
 import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
+import { trackPageView } from '@/lib/analytics';
+import { fbViewContent } from '@/lib/facebook-pixel';
 
 function PricingContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+
+  useEffect(() => {
+    trackPageView('/precos');
+    fbViewContent('Pricing Page');
+  }, []);
 
   const tiers = [
     {
@@ -119,9 +127,9 @@ function PricingContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       <Navbar />
-
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-40 md:pt-44 lg:pt-48 pb-12">
+      <main>
+        {/* Hero Section */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 sm:pt-40 md:pt-44 lg:pt-48 pb-12">
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-10">
             <Sparkles className="w-4 h-4" />
@@ -405,10 +413,11 @@ function PricingContent() {
           </p>
         </div>
       </section>
+      </main>
 
       {/* Footer */}
-      <Footer />
-    </div>
+        <Footer />
+        </div>
   );
 }
 

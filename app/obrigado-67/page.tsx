@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Crown,
   Download,
@@ -11,8 +13,14 @@ import {
 import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
+import { useEffect } from 'react';
+import { trackPageView } from '@/lib/analytics';
 
 export default function Obrigado67Page() {
+  useEffect(() => {
+    trackPageView('/obrigado-67');
+  }, []);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-emerald-50">
       <SimpleNavbar />

@@ -16,7 +16,8 @@ import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
 import { Footer } from '@/components/ui/footer';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { trackPageView } from '@/lib/analytics';
 
 function ThankYouContent() {
   const searchParams = useSearchParams();
@@ -24,6 +25,10 @@ function ThankYouContent() {
   
   const isProfessional = tier === 'professional';
   const isPremium = tier === 'premium';
+
+  useEffect(() => {
+    trackPageView('/obrigado-assinatura');
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-emerald-50">

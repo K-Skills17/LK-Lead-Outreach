@@ -1,8 +1,16 @@
+'use client';
+
 import { XCircle, CreditCard, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { SimpleNavbar } from '@/components/ui/navbar';
+import { useEffect } from 'react';
+import { trackPageView } from '@/lib/analytics';
 
 export default function PagamentoFalhouPage() {
+  useEffect(() => {
+    trackPageView('/pagamento-falhou');
+  }, []);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-pink-50">
       <SimpleNavbar />
