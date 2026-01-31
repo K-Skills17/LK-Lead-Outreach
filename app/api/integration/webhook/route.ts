@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'Invalid webhook payload',
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );
