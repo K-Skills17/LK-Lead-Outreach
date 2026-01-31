@@ -9,34 +9,70 @@ export const runtime = 'nodejs';
 
 // Validation schema for enriched lead from lead gen tool
 const enrichedLeadSchema = z.object({
-  // Lead information
+  // Required fields
   nome: z.string().min(1, 'Nome is required'),
   empresa: z.string().min(1, 'Empresa is required'),
   email: z.string().email('Invalid email'),
   phone: z.string().min(1, 'Phone is required'),
   
-  // Enrichment data
+  // Business information
   cargo: z.string().optional(),
   site: z.string().url().optional().or(z.literal('')),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country: z.string().optional(),
+  zip_code: z.string().optional(),
   dor_especifica: z.string().optional(),
   
-  // Analysis data from lead gen tool
+  // Enrichment data (all emails, contacts, tags)
+  all_emails: z.array(z.string().email()).optional(),
+  whatsapp: z.string().optional(),
+  contact_names: z.array(z.string()).optional(),
+  marketing_tags: z.array(z.string()).optional(),
+  
+  // Analysis data
   industry: z.string().optional(),
   company_size: z.string().optional(),
   revenue_range: z.string().optional(),
   pain_points: z.array(z.string()).optional(),
   business_analysis: z.string().optional(),
+  competitor_analysis: z.string().optional(),
   enrichment_score: z.number().min(0).max(100).optional(),
+  quality_score: z.number().min(0).max(100).optional(),
+  fit_score: z.number().min(0).max(100).optional(),
+  
+  // Reports & personalization
+  report_url: z.string().url().optional(),
+  landing_page_url: z.string().url().optional(),
+  personalization_data: z.any().optional(),
+  
+  // Outreach history
+  outreach_history: z.object({
+    emails_sent: z.array(z.any()).optional(),
+    whatsapp_messages: z.array(z.any()).optional(),
+  }).optional(),
+  
+  // Campaign context
+  campaign_name: z.string().optional(),
+  campaign_id: z.string().optional(),
+  niche: z.string().optional(),
+  location: z.string().optional(),
+  campaign_settings: z.any().optional(),
   
   // Metadata
   source: z.string().optional(),
-  campaign_name: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  lead_id: z.string().optional(),
+  created_at: z.string().optional(),
+  enriched_at: z.string().optional(),
   
   // Workflow options
   send_email_first: z.boolean().default(true),
   email_template: z.string().optional(),
   whatsapp_followup_delay_hours: z.number().default(24).optional(),
+  auto_assign_sdr: z.boolean().default(false).optional(),
+  sdr_email: z.string().email().optional(),
 });
 
 /**
@@ -171,16 +207,67 @@ export async function POST(request: NextRequest) {
         const scheduledSendAt = new Date();
         scheduledSendAt.setHours(scheduledSendAt.getHours() + delayHours);
 
-        // Prepare enrichment data as JSONB
+        // Prepare enrichment data as JSONB - store ALL data from lead gen tool
         const enrichmentData: Record<string, any> = {};
+        
+        // Business info
+        if (validated.address) enrichmentData.address = validated.address;
+        if (validated.city) enrichmentData.city = validated.city;
+        if (validated.state) enrichmentData.state = validated.state;
+        if (validated.country) enrichmentData.country = validated.country;
+        if (validated.zip_code) enrichmentData.zip_code = validated.zip_code;
+        
+        // Enrichment data
+        if (validated.all_emails && validated.all_emails.length > 0) enrichmentData.all_emails = validated.all_emails;
+        if (validated.whatsapp) enrichmentData.whatsapp = validated.whatsapp;
+        if (validated.contact_names && validated.contact_names.length > 0) enrichmentData.contact_names = validated.contact_names;
+        if (validated.marketing_tags && validated.marketing_tags.length > 0) enrichmentData.marketing_tags = validated.marketing_tags;
+        
+        // Analysis data
         if (validated.industry) enrichmentData.industry = validated.industry;
         if (validated.company_size) enrichmentData.company_size = validated.company_size;
         if (validated.revenue_range) enrichmentData.revenue_range = validated.revenue_range;
         if (validated.pain_points && validated.pain_points.length > 0) enrichmentData.pain_points = validated.pain_points;
+        if (validated.business_analysis) enrichmentData.business_analysis = validated.business_analysis;
+        if (validated.competitor_analysis) enrichmentData.competitor_analysis = validated.competitor_analysis;
         if (validated.enrichment_score !== undefined) enrichmentData.enrichment_score = validated.enrichment_score;
+        if (validated.quality_score !== undefined) enrichmentData.quality_score = validated.quality_score;
+        if (validated.fit_score !== undefined) enrichmentData.fit_score = validated.fit_score;
+        
+        // Reports & personalization
+        if (validated.landing_page_url) enrichmentData.landing_page_url = validated.landing_page_url;
+        if (validated.personalization_data) enrichmentData.personalization_data = validated.personalization_data;
+        
+        // Outreach history
+        if (validated.outreach_history) enrichmentData.outreach_history = validated.outreach_history;
+        
+        // Campaign context
+        if (validated.campaign_id) enrichmentData.campaign_id = validated.campaign_id;
+        if (validated.niche) enrichmentData.niche = validated.niche;
+        if (validated.location) enrichmentData.location = validated.location;
+        if (validated.campaign_settings) enrichmentData.campaign_settings = validated.campaign_settings;
+        
+        // Metadata
         if (validated.source) enrichmentData.source = validated.source;
         if (validated.tags && validated.tags.length > 0) enrichmentData.tags = validated.tags;
-        if (validated.business_analysis) enrichmentData.business_analysis = validated.business_analysis;
+        if (validated.lead_id) enrichmentData.lead_id = validated.lead_id;
+        if (validated.created_at) enrichmentData.created_at = validated.created_at;
+        if (validated.enriched_at) enrichmentData.enriched_at = validated.enriched_at;
+
+        // Handle SDR auto-assignment if requested
+        let assignedSdrId: string | undefined = undefined;
+        if (validated.auto_assign_sdr && validated.sdr_email) {
+          try {
+            const { getSDRByEmail } = await import('@/lib/sdr-auth');
+            const sdr = await getSDRByEmail(validated.sdr_email);
+            if (sdr) {
+              assignedSdrId = sdr.id;
+            }
+          } catch (error) {
+            console.error('[Integration] Error assigning SDR:', error);
+            // Continue without assignment if SDR lookup fails
+          }
+        }
 
         // Prepare lead data with all enrichment fields
         const leadToUpsert: any = {
@@ -203,8 +290,10 @@ export async function POST(request: NextRequest) {
           enrichment_score: validated.enrichment_score || null,
           source: validated.source || null,
           tags: validated.tags && validated.tags.length > 0 ? validated.tags : null,
+          report_url: validated.report_url || null,
           enrichment_data: Object.keys(enrichmentData).length > 0 ? enrichmentData : null,
           scheduled_send_at: scheduledSendAt.toISOString(),
+          assigned_sdr_id: assignedSdrId || null,
         };
 
         let leadId: string;
