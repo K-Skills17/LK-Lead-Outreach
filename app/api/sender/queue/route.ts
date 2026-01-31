@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
     const campaignId = searchParams.get('campaignId');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    // Build query
+    // Get current time for scheduled send filtering
+    const now = new Date();
+
+    // Build query - fetch pending leads with scheduled_send_at
+    // We'll filter scheduled sends in JavaScript to handle null values properly
     let query = supabaseAdmin
       .from('campaign_contacts')
       .select(`
@@ -86,11 +90,12 @@ export async function GET(request: NextRequest) {
         phone,
         personalized_message,
         status,
-        campaign_id
+        campaign_id,
+        scheduled_send_at
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
-      .limit(limit);
+      .limit(limit * 2); // Fetch more to account for filtering
 
     // If SDR authenticated, only get their assigned leads
     if (authResult.sdrId) {
@@ -113,8 +118,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Filter leads: only include those where scheduled_send_at has passed (or is null for backward compatibility)
+    const readyContacts = (contacts || []).filter((cc: any) => {
+      if (!cc.scheduled_send_at) {
+        // No scheduled time = ready immediately (backward compatibility)
+        return true;
+      }
+      // Check if scheduled time has passed
+      const scheduledTime = new Date(cc.scheduled_send_at);
+      return scheduledTime <= now;
+    }).slice(0, limit); // Limit to requested amount
+
     // Format response with all CSV fields
-    const formattedContacts = (contacts || []).map((cc: any) => ({
+    const formattedContacts = readyContacts.map((cc: any) => ({
       contactId: cc.id,
       phone: cc.phone,
       nome: cc.nome || cc.name || '',

@@ -166,8 +166,24 @@ export async function POST(request: NextRequest) {
           .eq('phone', normalizedPhone)
           .single();
 
-        // Prepare lead data
-        const leadToUpsert = {
+        // Calculate scheduled send time for WhatsApp (respect delay)
+        const delayHours = validated.whatsapp_followup_delay_hours || 24;
+        const scheduledSendAt = new Date();
+        scheduledSendAt.setHours(scheduledSendAt.getHours() + delayHours);
+
+        // Prepare enrichment data as JSONB
+        const enrichmentData: Record<string, any> = {};
+        if (validated.industry) enrichmentData.industry = validated.industry;
+        if (validated.company_size) enrichmentData.company_size = validated.company_size;
+        if (validated.revenue_range) enrichmentData.revenue_range = validated.revenue_range;
+        if (validated.pain_points && validated.pain_points.length > 0) enrichmentData.pain_points = validated.pain_points;
+        if (validated.enrichment_score !== undefined) enrichmentData.enrichment_score = validated.enrichment_score;
+        if (validated.source) enrichmentData.source = validated.source;
+        if (validated.tags && validated.tags.length > 0) enrichmentData.tags = validated.tags;
+        if (validated.business_analysis) enrichmentData.business_analysis = validated.business_analysis;
+
+        // Prepare lead data with all enrichment fields
+        const leadToUpsert: any = {
           campaign_id: campaignId,
           name: validated.nome, // Backward compatibility
           nome: validated.nome,
@@ -176,9 +192,19 @@ export async function POST(request: NextRequest) {
           site: validated.site || null,
           dor_especifica: validated.dor_especifica || null,
           phone: normalizedPhone,
+          email: validated.email || null,
           status: 'pending' as const,
-          // Store enrichment data in personalized_message for now (or create enrichment_data JSONB column)
           personalized_message: validated.business_analysis || null,
+          // Store all enrichment fields
+          industry: validated.industry || null,
+          company_size: validated.company_size || null,
+          revenue_range: validated.revenue_range || null,
+          pain_points: validated.pain_points && validated.pain_points.length > 0 ? validated.pain_points : null,
+          enrichment_score: validated.enrichment_score || null,
+          source: validated.source || null,
+          tags: validated.tags && validated.tags.length > 0 ? validated.tags : null,
+          enrichment_data: Object.keys(enrichmentData).length > 0 ? enrichmentData : null,
+          scheduled_send_at: scheduledSendAt.toISOString(),
         };
 
         let leadId: string;

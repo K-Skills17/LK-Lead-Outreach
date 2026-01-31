@@ -137,12 +137,32 @@ async function handleLeadAnalyzed(data: any) {
   if (data.phone) {
     const normalizedPhone = normalizePhone(data.phone);
     
+    // Build update object
+    const updateData: any = {
+      personalized_message: data.business_analysis || data.analysis_summary,
+    };
+
+    // Update enrichment_data JSONB if it exists
+    if (data.business_analysis || data.analysis_summary) {
+      // Get existing enrichment_data and merge
+      const { data: existingLead } = await supabaseAdmin
+        .from('campaign_contacts')
+        .select('enrichment_data')
+        .eq('phone', normalizedPhone)
+        .single();
+
+      const existingEnrichment = existingLead?.enrichment_data || {};
+      updateData.enrichment_data = {
+        ...existingEnrichment,
+        business_analysis: data.business_analysis || data.analysis_summary,
+        analysis_summary: data.analysis_summary,
+        analyzed_at: new Date().toISOString(),
+      };
+    }
+
     await supabaseAdmin
       .from('campaign_contacts')
-      .update({
-        personalized_message: data.business_analysis || data.analysis_summary,
-        // Could also store in a JSONB column for structured data
-      })
+      .update(updateData)
       .eq('phone', normalizedPhone);
 
     return NextResponse.json({ success: true, message: 'Analysis data updated' });
@@ -158,14 +178,54 @@ async function handleLeadAnalyzed(data: any) {
  * Handle report_ready event
  */
 async function handleReportReady(data: any) {
-  // Store report URL or trigger email with report
-  console.log('[Webhook] Report ready:', data.report_url);
-  
-  return NextResponse.json({ 
-    success: true, 
-    message: 'Report received',
-    report_url: data.report_url 
-  });
+  // Store report URL in database
+  if (data.phone && data.report_url) {
+    const normalizedPhone = normalizePhone(data.phone);
+    
+    // Build update object
+    const updateData: any = {
+      report_url: data.report_url,
+    };
+
+    // Also store in enrichment_data for easy access
+    const { data: existingLead } = await supabaseAdmin
+      .from('campaign_contacts')
+      .select('enrichment_data')
+      .eq('phone', normalizedPhone)
+      .single();
+
+    const existingEnrichment = existingLead?.enrichment_data || {};
+    updateData.enrichment_data = {
+      ...existingEnrichment,
+      report_url: data.report_url,
+      report_ready_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabaseAdmin
+      .from('campaign_contacts')
+      .update(updateData)
+      .eq('phone', normalizedPhone);
+
+    if (error) {
+      console.error('[Webhook] Error storing report URL:', error);
+      return NextResponse.json(
+        { error: 'Failed to store report URL', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Webhook] Report URL stored for:', normalizedPhone);
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Report URL stored',
+      report_url: data.report_url 
+    });
+  }
+
+  return NextResponse.json(
+    { error: 'Phone and report_url required' },
+    { status: 400 }
+  );
 }
 
 /**
