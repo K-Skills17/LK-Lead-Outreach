@@ -199,7 +199,7 @@ export async function verifyAndGetClinic(
   return {
     valid: true,
     tier: 'FREE',
-    clinicId: null, // Will be created on first use
+    clinicId: undefined, // Will be created on first use
     error: undefined,
   };
 }
