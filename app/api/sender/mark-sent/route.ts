@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSDRById } from '@/lib/sdr-auth';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -8,23 +9,34 @@ export const runtime = 'nodejs';
 
 /**
  * Verify Bearer token from Authorization header
+ * Supports both SENDER_SERVICE_TOKEN and SDR ID
  */
-function verifyBearerToken(request: NextRequest): boolean {
+async function verifyBearerToken(request: NextRequest): Promise<{ valid: boolean; sdrId?: string }> {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
+    return { valid: false };
   }
 
   const token = authHeader.substring(7);
   const expectedToken = process.env.SENDER_SERVICE_TOKEN;
 
-  if (!expectedToken) {
-    console.error('[API] SENDER_SERVICE_TOKEN not configured');
-    return false;
+  // Check if it's the service token (backward compatibility)
+  if (expectedToken && token === expectedToken) {
+    return { valid: true };
   }
 
-  return token === expectedToken;
+  // Check if it's an SDR ID (for SDR authentication)
+  try {
+    const sdr = await getSDRById(token);
+    if (sdr && sdr.is_active) {
+      return { valid: true, sdrId: sdr.id };
+    }
+  } catch (error) {
+    // Not an SDR ID, continue to return invalid
+  }
+
+  return { valid: false };
 }
 
 // Validation schema
@@ -42,7 +54,8 @@ const markSentSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Verify Bearer token
-    if (!verifyBearerToken(request)) {
+    const authResult = await verifyBearerToken(request);
+    if (!authResult.valid) {
       return NextResponse.json(
         {
           error: 'Unauthorized - Invalid or missing Bearer token',
@@ -55,6 +68,24 @@ export async function POST(request: NextRequest) {
 
     // Validate request body
     const validated = markSentSchema.parse(body);
+
+    // If SDR authenticated, verify the contact belongs to them
+    if (authResult.sdrId) {
+      const { data: contact } = await supabaseAdmin
+        .from('campaign_contacts')
+        .select('assigned_sdr_id')
+        .eq('id', validated.contactId)
+        .single();
+
+      if (!contact || contact.assigned_sdr_id !== authResult.sdrId) {
+        return NextResponse.json(
+          {
+            error: 'Contact not assigned to this SDR',
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     // Update contact status
     const { error } = await supabaseAdmin

@@ -3,136 +3,125 @@
 import { useState, useEffect } from 'react';
 import {
   Users,
-  TrendingUp,
-  Download,
-  CreditCard,
   AlertCircle,
-  DollarSign,
-  UserCheck,
-  UserX,
-  Trash2,
+  Shield,
+  UserPlus,
+  Mail,
+  Phone,
+  Building2,
+  CheckCircle,
+  Clock,
+  MessageSquare,
+  Loader2,
+  ArrowRight,
+  X,
 } from 'lucide-react';
 
-interface AnalyticsData {
-  overview: {
-    totalVisitors: number;
-    uniqueVisitors: number;
+interface SDR {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  stats: {
     totalLeads: number;
-    completedLeads: number;
-    abandonedLeads: number;
-    totalDownloads: number;
-    freeDownloads: number;
-    professionalDownloads: number;
-    premiumDownloads: number;
-    paymentsInitiated: number;
-    paymentsCompleted: number;
-    totalRevenue: string;
+    pendingLeads: number;
+    sentLeads: number;
+    totalCampaigns: number;
   };
-  conversionRates: {
-    visitorToLead: string;
-    leadToDownload: string;
-    downloadToPayment: string;
+}
+
+interface Lead {
+  id: string;
+  nome: string;
+  empresa: string;
+  cargo?: string;
+  phone: string;
+  status: string;
+  assigned_sdr_id?: string;
+  created_at: string;
+  campaigns?: {
+    id: string;
+    name: string;
   };
-  recentLeads: any[];
-  abandonedLeads: any[];
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  assigned_sdr_id?: string;
+  created_at: string;
+}
+
+interface OverviewData {
+  sdrs: SDR[];
+  campaigns: Campaign[];
+  leads: Lead[];
+  stats: {
+    totalSDRs: number;
+    totalCampaigns: number;
+    totalLeads: number;
+    pendingLeads: number;
+    sentLeads: number;
+    unassignedLeads: number;
+    unreadReplies: number;
+  };
 }
 
 export default function AdminDashboard() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [period, setPeriod] = useState('30');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [authToken, setAuthToken] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns'>('overview');
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+  const [assignSdrId, setAssignSdrId] = useState('');
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
-  const fetchAnalytics = async (token: string) => {
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem('admin_token');
+    if (savedToken) {
+      setAuthToken(savedToken);
+      setIsAuthenticated(true);
+      loadOverview(savedToken);
+    }
+  }, []);
+
+  const loadOverview = async (token: string) => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/admin/analytics?period=${period}`, {
+      setIsLoading(true);
+      const response = await fetch('/api/admin/overview', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          setError('Sessão expirada. Faça login novamente.');
-          setIsAuthenticated(false);
-          sessionStorage.removeItem('admin_token');
-          setAuthToken('');
-          return;
-        }
-        throw new Error('Erro ao carregar dados');
+      if (response.status === 401) {
+        setIsAuthenticated(false);
+        sessionStorage.removeItem('admin_token');
+        setAuthToken('');
+        return;
       }
 
-      const analyticsData = await response.json();
-      setData(analyticsData);
-      setError('');
-      setIsAuthenticated(true);
+      const overviewData = await response.json();
+      setData(overviewData);
     } catch (err) {
-      setError('Erro ao carregar analytics. Verifique sua conexão.');
-      console.error(err);
+      console.error('Error loading overview:', err);
+      setError('Failed to load data');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Check if token is saved in session storage
-    const savedToken = sessionStorage.getItem('admin_token');
-    if (savedToken) {
-      setAuthToken(savedToken);
-      fetchAnalytics(savedToken);
-    } else {
-      setLoading(false);
-    }
-  }, [period]);
-
-  const handleDeleteLead = async (id: string, name: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o lead "${name || 'Sem nome'}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/leads/delete?id=${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Falha ao excluir lead');
-      }
-
-      // Optimistically update UI or Refetch
-      if (data) {
-        setData({
-          ...data,
-          recentLeads: data.recentLeads.filter(l => l.id !== id),
-          abandonedLeads: data.abandonedLeads.filter(l => l.id !== id),
-          overview: {
-            ...data.overview,
-            // We could decrement counts here but simpler to just re-fetch to be accurate
-          }
-        });
-      }
-      
-      // Also trigger a real refetch to get accurate stats
-      fetchAnalytics(authToken);
-      
-    } catch (err) {
-      alert('Erro ao excluir lead');
-      console.error(err);
+      setIsLoading(false);
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/admin/login', {
@@ -141,36 +130,81 @@ export default function AdminDashboard() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Erro ao fazer login');
-        setLoading(false);
+        setError(result.error || 'Login failed');
+        setIsLoading(false);
         return;
       }
 
-      // Save token and fetch analytics
-      const token = data.token;
+      const token = result.token;
       setAuthToken(token);
       sessionStorage.setItem('admin_token', token);
-      await fetchAnalytics(token);
+      setIsAuthenticated(true);
+      await loadOverview(token);
     } catch (err) {
-      setError('Erro ao conectar. Tente novamente.');
+      setError('Network error. Please try again.');
       console.error(err);
-      setLoading(false);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleAssignLeads = async () => {
+    if (selectedLeads.size === 0 || !assignSdrId) return;
+
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/admin/assign-lead', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leadIds: Array.from(selectedLeads),
+          sdrId: assignSdrId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to assign leads');
+      }
+
+      // Reload data
+      await loadOverview(authToken);
+      setSelectedLeads(new Set());
+      setShowAssignModal(false);
+      setAssignSdrId('');
+    } catch (err) {
+      setError('Failed to assign leads');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <Users className="w-8 h-8 text-blue-600" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-slate-700 to-blue-600 rounded-full mb-4">
+              <Shield className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-            <p className="text-gray-600">LK Reactor Pro Analytics</p>
+            <p className="text-gray-600">LK Lead Outreach - Internal Tool</p>
           </div>
           
           <form onSubmit={handleLogin}>
@@ -182,25 +216,25 @@ export default function AdminDashboard() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="admin@lkdigital.org"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="admin@example.com"
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
             
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
+                Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="••••••••"
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
             
@@ -213,16 +247,16 @@ export default function AdminDashboard() {
             
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-slate-700 to-blue-600 text-white py-3 px-4 rounded-lg hover:shadow-xl transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {isLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Entrando...</span>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Logging in...</span>
                 </>
               ) : (
-                'Acessar Dashboard'
+                'Login'
               )}
             </button>
           </form>
@@ -231,12 +265,12 @@ export default function AdminDashboard() {
     );
   }
 
-  if (loading) {
+  if (isLoading && !data) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando analytics...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -244,246 +278,350 @@ export default function AdminDashboard() {
 
   if (!data) return null;
 
-  const StatCard = ({ icon: Icon, label, value, color, subValue }: any) => (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-      <h3 className="text-gray-500 text-sm font-medium mb-1">{label}</h3>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
-      {subValue && <p className="text-sm text-gray-500 mt-1">{subValue}</p>}
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">📊 LK Reactor - Analytics</h1>
-            <div className="flex items-center gap-4">
-              <select
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="7">Últimos 7 dias</option>
-                <option value="30">Últimos 30 dias</option>
-                <option value="90">Últimos 90 dias</option>
-              </select>
-              <button
-                onClick={() => {
-                  sessionStorage.removeItem('admin_token');
-                  setIsAuthenticated(false);
-                }}
-                className="text-sm text-red-600 hover:text-red-700"
-              >
-                Sair
-              </button>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('admin_token');
+                setIsAuthenticated(false);
+              }}
+              className="text-sm text-red-600 hover:text-red-700"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Overview Stats */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            icon={Users}
-            label="Total de Visitantes"
-            value={data.overview.totalVisitors.toLocaleString()}
-            color="bg-blue-500"
-            subValue={`${data.overview.uniqueVisitors} únicos`}
-          />
-          <StatCard
-            icon={UserCheck}
-            label="Leads Completos"
-            value={data.overview.completedLeads}
-            color="bg-green-500"
-            subValue={`${data.conversionRates.visitorToLead}% conversão`}
-          />
-          <StatCard
-            icon={Download}
-            label="Downloads Total"
-            value={data.overview.totalDownloads}
-            color="bg-purple-500"
-            subValue={`${data.overview.freeDownloads} grátis`}
-          />
-          <StatCard
-            icon={DollarSign}
-            label="Receita Total"
-            value={`R$ ${data.overview.totalRevenue}`}
-            color="bg-emerald-500"
-            subValue={`${data.overview.paymentsCompleted} pagamentos`}
-          />
-        </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-8 h-8 text-blue-600" />
+              <span className="text-3xl font-bold text-gray-900">{data.stats.totalSDRs}</span>
+            </div>
+            <p className="text-sm text-gray-600">Active SDRs</p>
+          </div>
 
-        {/* Downloads Breakdown */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">📥 Downloads por Plano</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <div className="text-4xl font-bold text-gray-900 mb-2">
-                {data.overview.freeDownloads}
-              </div>
-              <div className="text-sm text-gray-600 font-medium">Plano GRÁTIS</div>
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <MessageSquare className="w-8 h-8 text-slate-700" />
+              <span className="text-3xl font-bold text-gray-900">{data.stats.totalLeads}</span>
             </div>
-            <div className="text-center p-6 bg-blue-50 rounded-lg border-2 border-blue-300">
-              <div className="text-4xl font-bold text-blue-600 mb-2">
-                {data.overview.professionalDownloads}
-              </div>
-              <div className="text-sm text-blue-700 font-medium">Plano PROFESSIONAL</div>
+            <p className="text-sm text-gray-600">Total Leads</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <Clock className="w-8 h-8 text-yellow-600" />
+              <span className="text-3xl font-bold text-gray-900">{data.stats.pendingLeads}</span>
             </div>
-            <div className="text-center p-6 bg-purple-50 rounded-lg border-2 border-purple-300">
-              <div className="text-4xl font-bold text-purple-600 mb-2">
-                {data.overview.premiumDownloads}
-              </div>
-              <div className="text-sm text-purple-700 font-medium">Plano PREMIUM</div>
+            <p className="text-sm text-gray-600">Pending Leads</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <AlertCircle className="w-8 h-8 text-orange-600" />
+              <span className="text-3xl font-bold text-gray-900">{data.stats.unassignedLeads}</span>
             </div>
+            <p className="text-sm text-gray-600">Unassigned Leads</p>
           </div>
         </div>
 
-        {/* Conversion Funnel */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">📊 Funil de Conversão</h2>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-32 text-sm font-medium text-gray-700">Visitantes</div>
-              <div className="flex-1 bg-gray-200 rounded-full h-8 relative">
-                <div className="bg-blue-500 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ width: '100%' }}>
-                  {data.overview.uniqueVisitors}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-32 text-sm font-medium text-gray-700">Leads</div>
-              <div className="flex-1 bg-gray-200 rounded-full h-8 relative">
-                <div className="bg-green-500 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ width: `${(data.overview.completedLeads / data.overview.uniqueVisitors * 100)}%` }}>
-                  {data.overview.completedLeads} ({data.conversionRates.visitorToLead}%)
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-32 text-sm font-medium text-gray-700">Downloads</div>
-              <div className="flex-1 bg-gray-200 rounded-full h-8 relative">
-                <div className="bg-purple-500 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ width: `${(data.overview.totalDownloads / data.overview.uniqueVisitors * 100)}%` }}>
-                  {data.overview.totalDownloads}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-32 text-sm font-medium text-gray-700">Pagamentos</div>
-              <div className="flex-1 bg-gray-200 rounded-full h-8 relative">
-                <div className="bg-emerald-500 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ width: `${(data.overview.paymentsCompleted / data.overview.uniqueVisitors * 100)}%` }}>
-                  {data.overview.paymentsCompleted} ({data.conversionRates.downloadToPayment}%)
-                </div>
-              </div>
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow mb-6">
+          <div className="border-b border-gray-200">
+            <div className="flex space-x-1 px-6">
+              {(['overview', 'sdrs', 'leads', 'campaigns'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setSelectedTab(tab)}
+                  className={`px-4 py-3 font-semibold text-sm transition-colors capitalize ${
+                    selectedTab === tab
+                      ? 'text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Form Abandonment */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <AlertCircle className="w-6 h-6 text-orange-500" />
-            <h2 className="text-xl font-bold text-gray-900">⚠️ Leads Abandonados</h2>
-          </div>
-          <div className="mb-4 p-4 bg-orange-50 rounded-lg">
-            <p className="text-2xl font-bold text-orange-600">{data.overview.abandonedLeads}</p>
-            <p className="text-sm text-orange-700">leads começaram mas não completaram o formulário</p>
-          </div>
-          {data.abandonedLeads && data.abandonedLeads.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Email</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Status</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Data</th>
-                    <th className="text-right py-2 px-4 font-medium text-gray-700">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.abandonedLeads.slice(0, 10).map((lead, i) => (
-                    <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-4">{lead.email || '-'}</td>
-                      <td className="py-2 px-4">
-                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
-                          {lead.status}
-                        </span>
-                      </td>
-                      <td className="py-2 px-4 text-gray-600">
-                        {new Date(lead.created_at).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="py-2 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteLead(lead.id, lead.email || 'Lead sem email')}
-                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
-                          title="Excluir Lead"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          <div className="p-6">
+            {/* Overview Tab */}
+            {selectedTab === 'overview' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">SDRs Overview</h3>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {data.sdrs.map((sdr) => (
+                      <div key={sdr.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-semibold text-gray-900">{sdr.name}</p>
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                            {sdr.role}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">{sdr.email}</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500">Leads:</span>
+                            <span className="font-semibold ml-1">{sdr.stats.totalLeads}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Pending:</span>
+                            <span className="font-semibold ml-1">{sdr.stats.pendingLeads}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
-        {/* Recent Leads */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">📋 Últimos Leads</h2>
-          {data.recentLeads && data.recentLeads.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Nome</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Email</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">WhatsApp</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Clínica</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Receita Perdida</th>
-                    <th className="text-left py-2 px-4 font-medium text-gray-700">Data</th>
-                    <th className="text-right py-2 px-4 font-medium text-gray-700">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentLeads.map((lead, i) => (
-                    <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-4 font-medium">{lead.name}</td>
-                      <td className="py-2 px-4">{lead.email}</td>
-                      <td className="py-2 px-4">{lead.whatsapp}</td>
-                      <td className="py-2 px-4">{lead.clinic_name}</td>
-                      <td className="py-2 px-4 font-bold text-red-600">
-                        R$ {parseFloat(lead.lost_revenue || 0).toLocaleString('pt-BR')}
-                      </td>
-                      <td className="py-2 px-4 text-gray-600">
-                        {new Date(lead.created_at).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="py-2 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteLead(lead.id, lead.name || lead.email)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
-                          title="Excluir Lead"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-8">Nenhum lead ainda</p>
-          )}
+            {/* SDRs Tab */}
+            {selectedTab === 'sdrs' && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">All SDRs</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Name</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Email</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Role</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Total Leads</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Pending</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Campaigns</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.sdrs.map((sdr) => (
+                        <tr key={sdr.id} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-4 font-medium">{sdr.name}</td>
+                          <td className="py-2 px-4">{sdr.email}</td>
+                          <td className="py-2 px-4">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                              {sdr.role}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">{sdr.stats.totalLeads}</td>
+                          <td className="py-2 px-4">{sdr.stats.pendingLeads}</td>
+                          <td className="py-2 px-4">{sdr.stats.totalCampaigns}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Leads Tab */}
+            {selectedTab === 'leads' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
+                  {selectedLeads.size > 0 && (
+                    <button
+                      onClick={() => setShowAssignModal(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4">
+                          <input
+                            type="checkbox"
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeads(new Set(data.leads.map(l => l.id)));
+                              } else {
+                                setSelectedLeads(new Set());
+                              }
+                            }}
+                            checked={selectedLeads.size === data.leads.length && data.leads.length > 0}
+                          />
+                        </th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Name</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Company</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Phone</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Status</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Assigned To</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Campaign</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.leads.map((lead) => {
+                        const assignedSdr = data.sdrs.find(s => s.id === lead.assigned_sdr_id);
+                        return (
+                          <tr key={lead.id} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedLeads.has(lead.id)}
+                                onChange={(e) => {
+                                  const newSet = new Set(selectedLeads);
+                                  if (e.target.checked) {
+                                    newSet.add(lead.id);
+                                  } else {
+                                    newSet.delete(lead.id);
+                                  }
+                                  setSelectedLeads(newSet);
+                                }}
+                              />
+                            </td>
+                            <td className="py-2 px-4 font-medium">{lead.nome || '-'}</td>
+                            <td className="py-2 px-4">{lead.empresa || '-'}</td>
+                            <td className="py-2 px-4">{lead.phone}</td>
+                            <td className="py-2 px-4">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                lead.status === 'sent' ? 'bg-green-100 text-green-700' :
+                                lead.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {lead.status}
+                              </span>
+                            </td>
+                            <td className="py-2 px-4">
+                              {assignedSdr ? (
+                                <span className="text-sm">{assignedSdr.name}</span>
+                              ) : (
+                                <span className="text-sm text-gray-400">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-4 text-xs text-gray-600">
+                              {lead.campaigns?.name || '-'}
+                            </td>
+                            <td className="py-2 px-4 text-xs text-gray-600">
+                              {formatDate(lead.created_at)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Campaigns Tab */}
+            {selectedTab === 'campaigns' && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">All Campaigns</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Name</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Status</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Assigned To</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.campaigns.map((campaign) => {
+                        const assignedSdr = data.sdrs.find(s => s.id === campaign.assigned_sdr_id);
+                        return (
+                          <tr key={campaign.id} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-4 font-medium">{campaign.name}</td>
+                            <td className="py-2 px-4">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                campaign.status === 'active' ? 'bg-green-100 text-green-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {campaign.status}
+                              </span>
+                            </td>
+                            <td className="py-2 px-4">
+                              {assignedSdr ? (
+                                <span className="text-sm">{assignedSdr.name}</span>
+                              ) : (
+                                <span className="text-sm text-gray-400">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-4 text-xs text-gray-600">
+                              {formatDate(campaign.created_at)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
+
+      {/* Assign Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Assign Leads to SDR</h3>
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssignSdrId('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select SDR
+              </label>
+              <select
+                value={assignSdrId}
+                onChange={(e) => setAssignSdrId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choose an SDR...</option>
+                {data.sdrs.map((sdr) => (
+                  <option key={sdr.id} value={sdr.id}>
+                    {sdr.name} ({sdr.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleAssignLeads}
+                disabled={!assignSdrId || isLoading}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssignSdrId('');
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

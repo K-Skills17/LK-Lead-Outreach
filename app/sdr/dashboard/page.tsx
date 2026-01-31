@@ -1,0 +1,483 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  LogOut,
+  Mail,
+  MessageSquare,
+  Users,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Building2,
+  Phone,
+  Calendar,
+} from 'lucide-react';
+import { SimpleNavbar } from '@/components/ui/navbar';
+
+interface SDRUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface DashboardStats {
+  totalCampaigns: number;
+  totalLeads: number;
+  pendingLeads: number;
+  sentLeads: number;
+  unreadReplies: number;
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+}
+
+interface Lead {
+  id: string;
+  nome: string;
+  empresa: string;
+  cargo?: string;
+  phone: string;
+  status: string;
+  created_at: string;
+  campaigns?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface Reply {
+  id: string;
+  message: string;
+  received_at: string;
+  is_read: boolean;
+  campaign_contacts?: {
+    id: string;
+    nome: string;
+    empresa: string;
+    phone: string;
+    campaigns?: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+export default function SDRDashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<SDRUser | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies'>('overview');
+
+  useEffect(() => {
+    // Check authentication
+    const token = localStorage.getItem('sdr_token');
+    const userData = localStorage.getItem('sdr_user');
+
+    if (!token || !userData) {
+      router.push('/sdr/login');
+      return;
+    }
+
+    setUser(JSON.parse(userData));
+    loadDashboardData(token);
+  }, [router]);
+
+  const loadDashboardData = async (token: string) => {
+    try {
+      // Get SDR ID from user data
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) {
+        router.push('/sdr/login');
+        return;
+      }
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.status === 401) {
+        // Token invalid, redirect to login
+        localStorage.removeItem('sdr_token');
+        localStorage.removeItem('sdr_user');
+        router.push('/sdr/login');
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.sdr) {
+        setUser(data.sdr);
+        localStorage.setItem('sdr_user', JSON.stringify(data.sdr));
+      }
+
+      if (data.stats) {
+        setStats(data.stats);
+      }
+
+      if (data.campaigns) {
+        setCampaigns(data.campaigns);
+      }
+
+      if (data.recentLeads) {
+        setLeads(data.recentLeads);
+      }
+
+      if (data.unreadReplies) {
+        setReplies(data.unreadReplies);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sdr_token');
+    localStorage.removeItem('sdr_user');
+    router.push('/sdr/login');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
+      <SimpleNavbar />
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {user?.name}!
+              </h1>
+              <p className="text-gray-600">{user?.email}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Building2 className="w-8 h-8 text-blue-600" />
+                <span className="text-2xl font-bold text-gray-900">{stats.totalCampaigns}</span>
+              </div>
+              <p className="text-sm text-gray-600">Campaigns</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Users className="w-8 h-8 text-slate-700" />
+                <span className="text-2xl font-bold text-gray-900">{stats.totalLeads}</span>
+              </div>
+              <p className="text-sm text-gray-600">Total Leads</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-8 h-8 text-yellow-600" />
+                <span className="text-2xl font-bold text-gray-900">{stats.pendingLeads}</span>
+              </div>
+              <p className="text-sm text-gray-600">Pending</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-2">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+                <span className="text-2xl font-bold text-gray-900">{stats.sentLeads}</span>
+              </div>
+              <p className="text-sm text-gray-600">Sent</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-2">
+                <MessageSquare className="w-8 h-8 text-purple-600" />
+                <span className="text-2xl font-bold text-gray-900">{stats.unreadReplies}</span>
+              </div>
+              <p className="text-sm text-gray-600">Unread Replies</p>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="bg-white rounded-2xl shadow-xl mb-6">
+          <div className="border-b border-gray-200">
+            <div className="flex space-x-1 px-6">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`px-4 py-3 font-semibold text-sm transition-colors ${
+                  activeTab === 'overview'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('leads')}
+                className={`px-4 py-3 font-semibold text-sm transition-colors ${
+                  activeTab === 'leads'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Leads ({leads.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('replies')}
+                className={`px-4 py-3 font-semibold text-sm transition-colors relative ${
+                  activeTab === 'replies'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Replies
+                {stats && stats.unreadReplies > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                    {stats.unreadReplies}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                {/* Recent Campaigns */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Campaigns</h3>
+                  {campaigns.length === 0 ? (
+                    <p className="text-gray-500">No campaigns assigned yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {campaigns.slice(0, 5).map((campaign) => (
+                        <div
+                          key={campaign.id}
+                          className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-gray-900">{campaign.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {formatDate(campaign.created_at)}
+                              </p>
+                            </div>
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                campaign.status === 'active'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {campaign.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Leads */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Leads</h3>
+                  {leads.length === 0 ? (
+                    <p className="text-gray-500">No leads assigned yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {leads.slice(0, 5).map((lead) => (
+                        <div
+                          key={lead.id}
+                          className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-gray-900">{lead.nome}</p>
+                              <p className="text-sm text-gray-600">{lead.empresa}</p>
+                              {lead.cargo && (
+                                <p className="text-xs text-gray-500">{lead.cargo}</p>
+                              )}
+                            </div>
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                lead.status === 'sent'
+                                  ? 'bg-green-100 text-green-700'
+                                  : lead.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {lead.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Leads Tab */}
+            {activeTab === 'leads' && (
+              <div>
+                {leads.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No leads assigned yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {leads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <p className="font-semibold text-gray-900">{lead.nome}</p>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  lead.status === 'sent'
+                                    ? 'bg-green-100 text-green-700'
+                                    : lead.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}
+                              >
+                                {lead.status}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-sm text-gray-700 flex items-center gap-2">
+                                <Building2 className="w-4 h-4" />
+                                {lead.empresa}
+                              </p>
+                              {lead.cargo && (
+                                <p className="text-sm text-gray-600">{lead.cargo}</p>
+                              )}
+                              <p className="text-sm text-gray-600 flex items-center gap-2">
+                                <Phone className="w-4 h-4" />
+                                {lead.phone}
+                              </p>
+                              {lead.campaigns && (
+                                <p className="text-xs text-gray-500">
+                                  Campaign: {lead.campaigns.name}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatDate(lead.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Replies Tab */}
+            {activeTab === 'replies' && (
+              <div>
+                {replies.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No unread replies.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {replies.map((reply) => (
+                      <div
+                        key={reply.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {reply.campaign_contacts?.nome || 'Unknown'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {reply.campaign_contacts?.empresa}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {reply.campaign_contacts?.phone}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatDate(reply.received_at)}
+                            </p>
+                            {!reply.is_read && (
+                              <span className="inline-block mt-1 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                                New
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-white rounded-lg border border-gray-200">
+                          <p className="text-sm text-gray-700">{reply.message}</p>
+                        </div>
+                        {reply.campaign_contacts?.campaigns && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Campaign: {reply.campaign_contacts.campaigns.name}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
