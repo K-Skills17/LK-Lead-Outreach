@@ -127,7 +127,12 @@ export type Database = {
         Row: {
           id: string;
           campaign_id: string;
-          name: string;
+          name: string; // Keep for backward compatibility
+          nome: string | null;
+          empresa: string | null;
+          cargo: string | null;
+          site: string | null;
+          dor_especifica: string | null;
           phone: string;
           status: 'pending' | 'sent' | 'failed';
           personalized_message: string | null;
@@ -139,7 +144,12 @@ export type Database = {
         Insert: {
           id?: string;
           campaign_id: string;
-          name: string;
+          name?: string; // Keep for backward compatibility
+          nome?: string | null;
+          empresa?: string | null;
+          cargo?: string | null;
+          site?: string | null;
+          dor_especifica?: string | null;
           phone: string;
           status?: 'pending' | 'sent' | 'failed';
           personalized_message?: string | null;
@@ -152,6 +162,11 @@ export type Database = {
           id?: string;
           campaign_id?: string;
           name?: string;
+          nome?: string | null;
+          empresa?: string | null;
+          cargo?: string | null;
+          site?: string | null;
+          dor_especifica?: string | null;
           phone?: string;
           status?: 'pending' | 'sent' | 'failed';
           personalized_message?: string | null;

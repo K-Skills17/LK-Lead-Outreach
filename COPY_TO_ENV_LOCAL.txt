@@ -1,0 +1,78 @@
+# ============================================
+# 🔐 LK LEAD OUTREACH - Environment Variables
+# ============================================
+# Copy everything below this line into your .env.local file
+# ============================================
+
+# ============================================
+# ✅ REQUIRED - Supabase (Database & Backend)
+# ============================================
+# Get these from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
+# 
+# 1. Go to Supabase Dashboard
+# 2. Select your project
+# 3. Settings → API
+# 4. Copy the values below
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjE2MjM5MDIyLCJleHAiOjE5MzE4MTUwMjJ9.your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2MTYyMzkwMjIsImV4cCI6MTkzMTgxNTAyMn0.your_service_role_key_here
+
+# ============================================
+# 🤖 RECOMMENDED - OpenAI (AI Message Generation)
+# ============================================
+# Get from: https://platform.openai.com/api-keys
+# 
+# 1. Go to OpenAI Platform
+# 2. API Keys → Create new secret key
+# 3. Copy the key (starts with sk-)
+# 
+# ⚠️ Without this, AI message generation won't work
+OPENAI_API_KEY=sk-proj-your_openai_api_key_here
+
+# ============================================
+# 🖥️ RECOMMENDED - Sender Service (Desktop App)
+# ============================================
+# Used by desktop app to authenticate API requests
+# 
+# Generate a secure random token (min 32 characters):
+# Windows PowerShell: -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_})
+# Or use: https://www.random.org/strings/
+# 
+# ⚠️ Without this, desktop app cannot communicate with web app
+SENDER_SERVICE_TOKEN=your_secure_random_token_min_32_characters_here
+
+# ============================================
+# 🔑 OPTIONAL - License Verification
+# ============================================
+# If you use an external service for license verification
+# (Google Apps Script, Make.com webhook, etc.)
+# LICENSE_VERIFY_ENDPOINT=https://hook.us2.make.com/your-webhook-id
+
+# ============================================
+# 📧 OPTIONAL - Email Service (Resend)
+# ============================================
+# If you want to send automated emails
+# Get from: https://resend.com/api-keys
+# RESEND_API_KEY=re_your_resend_api_key_here
+# EMAIL_FROM=noreply@yourdomain.com
+
+# ============================================
+# 🔗 LEAD GEN TOOL INTEGRATION
+# ============================================
+# Token for integration with Lead Generation Tool
+# Generate: -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | % {[char]$_})
+LEAD_GEN_INTEGRATION_TOKEN=your_secure_random_token_min_32_characters_here
+
+# ============================================
+# 📊 OPTIONAL - Analytics & Tracking
+# ============================================
+# Facebook Pixel (for tracking conversions)
+# NEXT_PUBLIC_FB_PIXEL_ID=1410687670551454
+# FB_CAPI_ACCESS_TOKEN=EAAMCby...your_facebook_access_token
+# FB_TEST_EVENT_CODE=TEST12345
+
+# ============================================
+# 🔧 OPTIONAL - Development Settings
+# ============================================
+# NODE_ENV=development
+# PORT=3000

@@ -158,6 +158,11 @@ export async function getClinicByLicense(
  * @param email - Optional email address
  * @returns Object with valid status, tier, and clinicId
  */
+/**
+ * Verify and get clinic (INTERNAL TOOL - No license verification needed)
+ * 
+ * For internal tool, we just check if clinic exists or create a default one
+ */
 export async function verifyAndGetClinic(
   licenseKey: string,
   email?: string
@@ -167,31 +172,34 @@ export async function verifyAndGetClinic(
   clinicId?: string;
   error?: string;
 }> {
-  // First check if clinic exists in our database
-  const existingClinicId = await getClinicByLicense(licenseKey);
+  // For internal tool, license key is optional
+  // If provided, check if clinic exists, otherwise create default
   
-  if (existingClinicId) {
-    // Clinic exists, get tier from database
-    const { data: clinic } = await supabaseAdmin
-      .from('clinics')
-      .select('tier')
-      .eq('id', existingClinicId)
-      .single();
+  if (licenseKey) {
+    const existingClinicId = await getClinicByLicense(licenseKey);
+    
+    if (existingClinicId) {
+      const { data: clinic } = await supabaseAdmin
+        .from('clinics')
+        .select('tier')
+        .eq('id', existingClinicId)
+        .single();
 
-    return {
-      valid: true,
-      tier: clinic?.tier || 'FREE',
-      clinicId: existingClinicId,
-    };
+      return {
+        valid: true,
+        tier: clinic?.tier || 'FREE',
+        clinicId: existingClinicId,
+      };
+    }
   }
 
-  // Clinic doesn't exist, verify with Apps Script and create
-  const result = await verifyLicense(licenseKey, email);
-  
+  // For internal tool, create a default clinic if needed
+  // Or return valid with a default clinic ID
+  // This allows the tool to work without license verification
   return {
-    valid: result.valid,
-    tier: result.tier,
-    clinicId: result.clinicId,
-    error: result.error,
+    valid: true,
+    tier: 'FREE',
+    clinicId: null, // Will be created on first use
+    error: undefined,
   };
 }

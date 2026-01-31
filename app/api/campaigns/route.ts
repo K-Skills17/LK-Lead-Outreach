@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyAndGetClinic } from '@/lib/license';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getClinicCampaigns } from '@/lib/campaigns';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,55 @@ const createCampaignSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),
   name: z.string().min(1, 'Campaign name is required').max(200),
 });
+
+/**
+ * GET /api/campaigns
+ * 
+ * List all campaigns for a clinic
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    const licenseKey = authHeader?.replace('Bearer ', '') || 
+                      new URL(request.url).searchParams.get('licenseKey');
+
+    if (!licenseKey) {
+      return NextResponse.json(
+        {
+          error: 'License key is required',
+        },
+        { status: 401 }
+      );
+    }
+
+    // Verify license and get clinic ID
+    const licenseResult = await verifyAndGetClinic(licenseKey);
+
+    if (!licenseResult.valid || !licenseResult.clinicId) {
+      return NextResponse.json(
+        {
+          error: licenseResult.error || 'Invalid license key',
+        },
+        { status: 401 }
+      );
+    }
+
+    // Get campaigns
+    const campaigns = await getClinicCampaigns(licenseResult.clinicId);
+
+    return NextResponse.json({
+      campaigns: campaigns || [],
+    });
+  } catch (error) {
+    console.error('[API] Error listing campaigns:', error);
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+      },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * POST /api/campaigns

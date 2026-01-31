@@ -14,15 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LK Reactor Pro - Recupere Pacientes no WhatsApp",
-  description: "Transforme contatos inativos em consultas reais com controle, segurança e inteligência. Sistema de reativação de pacientes para clínicas odontológicas.",
+  title: "LK Lead Outreach - Recupere Leads no WhatsApp",
+  description: "Transforme contatos inativos em conversões reais com controle, segurança e inteligência. Sistema de cold outreach e follow-up para empresas B2B.",
   icons: {
     icon: "/lk-reactor-logo.svg",
     apple: "/lk-reactor-logo.svg",
   },
   openGraph: {
-    title: "LK Reactor Pro - Recupere Pacientes no WhatsApp",
-    description: "Transforme contatos inativos em consultas reais com controle, segurança e inteligência.",
+    title: "LK Lead Outreach - Recupere Leads no WhatsApp",
+    description: "Transforme contatos inativos em conversões reais com controle, segurança e inteligência.",
     images: ["/lk-reactor-logo.svg"],
   },
 };

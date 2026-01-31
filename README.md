@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 LK Lead Outreach
 
-## Getting Started
+Professional B2B lead outreach automation tool with AI-powered message generation, email sending, and WhatsApp follow-ups.
 
-First, run the development server:
+## ✨ Features
 
+- 📊 **CSV Import** - Import leads with enrichment data (nome, empresa, cargo, site, dor_especifica)
+- 🤖 **AI Message Generation** - GPT-4 powered personalized messages using all lead data
+- 📧 **Email Automation** - Send initial emails via Resend
+- 💬 **WhatsApp Follow-ups** - Queue and send WhatsApp messages
+- 👥 **SDR Accounts** - Multi-user support with login and dashboard
+- 🔗 **Lead Gen Integration** - Seamless integration with your lead generation tool
+- 📈 **Campaign Management** - Organize and track outreach campaigns
+
+## 🚀 Quick Start
+
+### Local Development
+
+1. **Clone repository:**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/yourusername/lk-lead-outreach.git
+cd lk-lead-outreach
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Install dependencies:**
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Set up environment:**
+```bash
+# Copy template
+cp COPY_TO_ENV_LOCAL.txt .env.local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Edit .env.local and add your credentials
+```
 
-## Learn More
+4. **Run database migrations:**
+- Go to Supabase Dashboard → SQL Editor
+- Run: `supabase/migrations/000_complete_setup.sql`
 
-To learn more about Next.js, take a look at the following resources:
+5. **Start development server:**
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+6. **Open browser:**
+```
+http://localhost:3000/dashboard
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📚 Documentation
 
-## Deploy on Vercel
+- **Local Setup:** `LOCAL_SETUP_GUIDE.md`
+- **CSV Import:** `LOCAL_CSV_IMPORT_SETUP.md`
+- **SDR Accounts:** `SDR_ACCOUNTS_SETUP.md`
+- **Lead Gen Integration:** `LEAD_GEN_INTEGRATION_GUIDE.md`
+- **Vercel Deployment:** `VERCEL_DEPLOYMENT_GUIDE.md`
+- **Quick Deploy:** `QUICK_VERCEL_DEPLOY.md`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔗 Integration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Lead Generation Tool Integration
+
+**API Endpoint:**
+```
+POST /api/integration/leads/receive
+Authorization: Bearer YOUR_INTEGRATION_TOKEN
+```
+
+**Webhook:**
+```
+POST /api/integration/webhook
+```
+
+See `LEAD_GEN_INTEGRATION_GUIDE.md` for complete integration guide.
+
+## 🛠️ Tech Stack
+
+- **Framework:** Next.js 16
+- **Database:** Supabase (PostgreSQL)
+- **Styling:** Tailwind CSS
+- **AI:** OpenAI GPT-4o-mini
+- **Email:** Resend
+- **Deployment:** Vercel
+
+## 📋 Environment Variables
+
+See `COPY_TO_ENV_LOCAL.txt` for complete list.
+
+**Required:**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+**Recommended:**
+- `OPENAI_API_KEY`
+- `SENDER_SERVICE_TOKEN`
+- `RESEND_API_KEY`
+- `LEAD_GEN_INTEGRATION_TOKEN`
+
+## 🚀 Deploy to Vercel
+
+1. Push code to GitHub
+2. Go to [vercel.com](https://vercel.com)
+3. Import repository
+4. Add environment variables
+5. Deploy!
+
+See `VERCEL_DEPLOYMENT_GUIDE.md` for detailed instructions.
+
+## 📖 API Endpoints
+
+- `POST /api/integration/leads/receive` - Receive enriched leads
+- `POST /api/integration/webhook` - Webhook events
+- `GET /api/integration/status` - Integration status
+- `POST /api/sdr/login` - SDR login
+- `GET /api/sdr/dashboard` - SDR dashboard data
+- `POST /api/campaigns` - Create campaign
+- `POST /api/campaigns/[id]/import-csv` - Import CSV
+- `POST /api/campaigns/[id]/leads/[leadId]/generate-message` - Generate AI message
+
+## 🤝 Contributing
+
+This is an internal tool. For questions or issues, contact the development team.
+
+## 📄 License
+
+Internal use only.
+
+---
+
+**Built with ❤️ by LK Digital**

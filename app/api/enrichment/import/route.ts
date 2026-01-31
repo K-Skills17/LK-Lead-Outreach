@@ -5,46 +5,36 @@ import { verifyCampaignOwnership, isPhoneBlocked, isPhoneInCampaign } from '@/li
 import { normalizePhone } from '@/lib/phone';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Validation schema
-const contactSchema = z.object({
+// Validation schema for direct import from enrichment tool
+const leadSchema = z.object({
   nome: z.string().min(1, 'Nome is required'),
   empresa: z.string().min(1, 'Empresa is required'),
   cargo: z.string().optional(),
   site: z.string().url().optional().or(z.literal('')),
   dor_especifica: z.string().optional(),
   phone: z.string().min(10, 'Phone is required'),
+  email: z.string().email().optional(),
 });
 
-const importCsvSchema = z.object({
+const importSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),
-  contacts: z.array(contactSchema).min(1, 'At least one contact is required'),
+  campaignId: z.string().uuid('Invalid campaign ID'),
+  leads: z.array(leadSchema).min(1, 'At least one lead is required'),
 });
-
-interface ImportResult {
-  imported: number;
-  skipped: number;
-  errors: string[];
-}
 
 /**
- * POST /api/campaigns/[id]/import-csv
+ * POST /api/enrichment/import
  * 
- * Import contacts from CSV data into a campaign
+ * Direct import of leads from your enrichment tool
+ * Your enrichment tool can call this endpoint to send leads directly
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   try {
-    const { id: campaignId } = await params;
     const body = await request.json();
-
-    // Validate request body
-    const validated = importCsvSchema.parse(body);
+    const validated = importSchema.parse(body);
 
     // Verify license and get clinic ID
     const licenseResult = await verifyAndGetClinic(validated.licenseKey);
@@ -60,7 +50,7 @@ export async function POST(
 
     // Verify campaign ownership
     const isOwner = await verifyCampaignOwnership(
-      campaignId,
+      validated.campaignId,
       licenseResult.clinicId
     );
 
@@ -73,16 +63,16 @@ export async function POST(
       );
     }
 
-    // Process contacts
-    const result: ImportResult = {
+    // Process leads
+    const result = {
       imported: 0,
       skipped: 0,
-      errors: [],
+      errors: [] as string[],
     };
 
-    const contactsToInsert: Array<{
+    const leadsToInsert: Array<{
       campaign_id: string;
-      name: string; // Keep for backward compatibility
+      name: string;
       nome: string;
       empresa: string;
       cargo?: string | null;
@@ -92,61 +82,58 @@ export async function POST(
       status: 'pending';
     }> = [];
 
-    for (const contact of validated.contacts) {
+    for (const lead of validated.leads) {
       try {
         // Normalize phone to E.164
-        const normalizedPhone = normalizePhone(contact.phone);
+        const normalizedPhone = normalizePhone(lead.phone);
 
         // Check if phone is blocked
         const isBlocked = await isPhoneBlocked(normalizedPhone);
         if (isBlocked) {
           result.skipped++;
-          result.errors.push(`Blocked: ${contact.phone} (${contact.nome})`);
+          result.errors.push(`Blocked: ${lead.phone} (${lead.nome})`);
           continue;
         }
 
         // Check if phone already exists in campaign
-        const isDuplicate = await isPhoneInCampaign(campaignId, normalizedPhone);
+        const isDuplicate = await isPhoneInCampaign(validated.campaignId, normalizedPhone);
         if (isDuplicate) {
           result.skipped++;
-          result.errors.push(`Duplicate: ${contact.phone} (${contact.nome})`);
+          result.errors.push(`Duplicate: ${lead.phone} (${lead.nome})`);
           continue;
         }
 
         // Add to batch insert
-        contactsToInsert.push({
-          campaign_id: campaignId,
-          name: contact.nome, // Keep for backward compatibility
-          nome: contact.nome,
-          empresa: contact.empresa,
-          cargo: contact.cargo || null,
-          site: contact.site || null,
-          dor_especifica: contact.dor_especifica || null,
+        leadsToInsert.push({
+          campaign_id: validated.campaignId,
+          name: lead.nome,
+          nome: lead.nome,
+          empresa: lead.empresa,
+          cargo: lead.cargo || null,
+          site: lead.site || null,
+          dor_especifica: lead.dor_especifica || null,
           phone: normalizedPhone,
           status: 'pending',
         });
       } catch (error) {
         result.skipped++;
-        const errorMsg =
-          error instanceof Error ? error.message : 'Unknown error';
-        result.errors.push(
-          `Invalid phone: ${contact.phone} (${contact.nome}) - ${errorMsg}`
-        );
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        result.errors.push(`Invalid lead: ${lead.phone} (${lead.nome}) - ${errorMsg}`);
       }
     }
 
-    // Bulk insert valid contacts
-    if (contactsToInsert.length > 0) {
+    // Bulk insert valid leads
+    if (leadsToInsert.length > 0) {
       const { data, error } = await supabaseAdmin
         .from('campaign_contacts')
-        .insert(contactsToInsert)
+        .insert(leadsToInsert)
         .select('id');
 
       if (error) {
-        console.error('[API] Error inserting contacts:', error);
+        console.error('[API] Error inserting leads:', error);
         return NextResponse.json(
           {
-            error: 'Failed to import contacts',
+            error: 'Failed to import leads',
             details: error.message,
           },
           { status: 500 }
@@ -158,7 +145,6 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    // Handle validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
@@ -169,8 +155,7 @@ export async function POST(
       );
     }
 
-    // Handle other errors
-    console.error('[API] Error importing contacts:', error);
+    console.error('[API] Error importing leads:', error);
     return NextResponse.json(
       {
         error: 'Internal server error',

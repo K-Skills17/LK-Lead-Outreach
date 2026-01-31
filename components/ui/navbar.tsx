@@ -48,25 +48,25 @@ export function Navbar() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
             <Link 
-              href="/precos" 
-              className="text-sm font-medium text-gray-700 hover:text-emerald-600 transition-colors relative group"
+              href="/dashboard" 
+              className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors relative group"
             >
-              Preços
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all group-hover:w-full"></span>
+              Dashboard
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span>
             </Link>
             <Link 
-              href="/precos" 
-              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300 relative overflow-hidden group"
+              href="/dashboard" 
+              className="px-6 py-2.5 bg-gradient-to-r from-slate-700 to-blue-600 text-white text-sm font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300 relative overflow-hidden group"
             >
               <span className="relative z-10">Começar Agora</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-700 to-teal-700 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-800 to-blue-700 opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </Link>
           </nav>
 
           {/* Mobile menu button */}
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="md:hidden p-2 text-gray-700 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? (
@@ -83,15 +83,15 @@ export function Navbar() {
         <div className="md:hidden border-t border-gray-100 bg-white/98 backdrop-blur-xl">
           <div className="px-4 py-6 space-y-3">
             <Link 
-              href="/precos" 
-              className="block px-4 py-3 text-sm font-medium text-gray-700 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+              href="/dashboard" 
+              className="block px-4 py-3 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              Preços
+              Dashboard
             </Link>
             <Link 
-              href="/precos" 
-              className="block px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg hover:shadow-lg transition-all text-center"
+              href="/dashboard" 
+              className="block px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-slate-700 to-blue-600 rounded-lg hover:shadow-lg transition-all text-center"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Começar Agora

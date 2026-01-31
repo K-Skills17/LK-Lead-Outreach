@@ -54,20 +54,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch pending contacts
+    // Fetch pending contacts with all CSV fields
     const { data: contacts, error } = await supabaseAdmin
       .from('campaign_contacts')
       .select(`
         id,
-        contact_id,
+        nome,
+        empresa,
+        cargo,
+        site,
+        dor_especifica,
+        phone,
         personalized_message,
-        status,
-        contacts (
-          id,
-          name,
-          phone,
-          clinic_id
-        )
+        status
       `)
       .eq('campaign_id', campaignId)
       .eq('status', 'pending')
@@ -82,13 +81,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Format response
+    // Format response with all CSV fields
     const formattedContacts = (contacts || []).map((cc: any) => ({
       contactId: cc.id,
-      phone: cc.contacts.phone,
-      name: cc.contacts.name,
+      phone: cc.phone,
+      nome: cc.nome || cc.name || '',
+      empresa: cc.empresa || '',
+      cargo: cc.cargo || null,
+      site: cc.site || null,
+      dor_especifica: cc.dor_especifica || null,
       message: cc.personalized_message,
-      clinicId: cc.contacts.clinic_id,
     }));
 
     return NextResponse.json({

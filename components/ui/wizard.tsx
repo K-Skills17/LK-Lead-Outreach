@@ -12,10 +12,10 @@ interface WizardContainerProps {
 
 export function WizardContainer({ children, className = '' }: WizardContainerProps) {
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-blue-50 flex items-center justify-center p-4 pt-24 sm:pt-28 md:pt-32 relative overflow-hidden ${className}`}>
+    <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 flex items-center justify-center p-4 pt-24 sm:pt-28 md:pt-32 relative overflow-hidden ${className}`}>
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-200/30 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-slate-200/30 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
       
@@ -83,18 +83,18 @@ export function WizardProgress({ currentStep, totalSteps }: WizardProgressProps)
     <div className="mb-8">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-emerald-600" />
+          <Sparkles className="w-4 h-4 text-blue-600" />
           <span className="text-sm font-semibold text-gray-700">
             Passo {currentStep} de {totalSteps}
           </span>
         </div>
-        <span className="text-sm font-bold text-emerald-600">
+        <span className="text-sm font-bold text-blue-600">
           {Math.round((currentStep / totalSteps) * 100)}%
         </span>
       </div>
       <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
         <motion.div
-          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full shadow-lg"
+          className="h-full bg-gradient-to-r from-slate-700 to-blue-600 rounded-full shadow-lg"
           initial={{ width: 0 }}
           animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
           transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
@@ -126,7 +126,7 @@ export function WizardButton({
 }: WizardButtonProps) {
   const baseClasses = 'w-full h-14 rounded-xl font-semibold text-base transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg';
   const variantClasses = variant === 'primary'
-    ? 'bg-gradient-to-r from-emerald-700 to-teal-700 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100'
+    ? 'bg-gradient-to-r from-slate-800 to-blue-600 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100'
     : 'bg-white text-gray-800 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98]';
 
   return (
@@ -171,7 +171,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
         </label>
         <div className="relative group">
           {icon && (
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600 transition-colors">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors">
               {icon}
             </div>
           )}
@@ -179,7 +179,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
             ref={ref}
             id={id}
             type="number"
-            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
+            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
             } ${className}`}
             {...props}
@@ -238,7 +238,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
         <div className="relative group">
-          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-600 font-bold text-lg">
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-blue-600 font-bold text-lg">
             R$
           </div>
           <input
@@ -247,7 +247,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             type="text"
             value={displayValue}
             onChange={handleChange}
-            className={`w-full h-14 px-4 pl-14 bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
+            className={`w-full h-14 px-4 pl-14 bg-white border-2 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
             } ${className}`}
             placeholder="0,00"
@@ -301,7 +301,7 @@ export function SliderInput({
         <label htmlFor={id} className="block text-sm font-semibold text-gray-800">
           {label}
         </label>
-        <div className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xl font-bold rounded-xl shadow-lg">
+        <div className="px-4 py-2 bg-gradient-to-r from-slate-700 to-blue-600 text-white text-xl font-bold rounded-xl shadow-lg">
           {value}%
         </div>
       </div>
@@ -316,7 +316,7 @@ export function SliderInput({
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full h-3 bg-gray-200 rounded-full appearance-none cursor-pointer slider-thumb"
           style={{
-            background: `linear-gradient(to right, #10b981 0%, #14b8a6 ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`,
+            background: `linear-gradient(to right, #1e293b 0%, #2563eb ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`,
           }}
         />
       </div>
@@ -331,28 +331,28 @@ export function SliderInput({
           width: 24px;
           height: 24px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #10b981, #14b8a6);
+          background: linear-gradient(135deg, #1e293b, #2563eb);
           cursor: pointer;
-          box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+          box-shadow: 0 4px 8px rgba(30, 41, 59, 0.4);
           transition: all 0.2s;
         }
         .slider-thumb::-webkit-slider-thumb:hover {
           transform: scale(1.1);
-          box-shadow: 0 6px 12px rgba(16, 185, 129, 0.5);
+          box-shadow: 0 6px 12px rgba(37, 99, 235, 0.5);
         }
         .slider-thumb::-moz-range-thumb {
           width: 24px;
           height: 24px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #10b981, #14b8a6);
+          background: linear-gradient(135deg, #1e293b, #2563eb);
           cursor: pointer;
           border: none;
-          box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+          box-shadow: 0 4px 8px rgba(30, 41, 59, 0.4);
           transition: all 0.2s;
         }
         .slider-thumb::-moz-range-thumb:hover {
           transform: scale(1.1);
-          box-shadow: 0 6px 12px rgba(16, 185, 129, 0.5);
+          box-shadow: 0 6px 12px rgba(37, 99, 235, 0.5);
         }
       `}</style>
     </div>
@@ -403,7 +403,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         </label>
         <div className="relative group">
           {icon && (
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600 transition-colors">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors">
               {icon}
             </div>
           )}
@@ -413,7 +413,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
             type="tel"
             value={value}
             onChange={handleChange}
-            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
+            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
             } ${className}`}
             placeholder="+55 (11) 99999-9999"
@@ -458,7 +458,7 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
         </label>
         <div className="relative group">
           {icon && (
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600 transition-colors">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors">
               {icon}
             </div>
           )}
@@ -466,7 +466,7 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
             ref={ref}
             id={id}
             type="email"
-            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
+            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
             } ${className}`}
             {...props}
@@ -510,7 +510,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
         </label>
         <div className="relative group">
           {icon && (
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-600 transition-colors">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors">
               {icon}
             </div>
           )}
@@ -518,7 +518,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
             ref={ref}
             id={id}
             type="text"
-            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-base font-medium ${
+            className={`w-full h-14 px-4 ${icon ? 'pl-12' : ''} bg-white border-2 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-base font-medium ${
               error ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100' : 'border-gray-200 hover:border-gray-300'
             } ${className}`}
             {...props}

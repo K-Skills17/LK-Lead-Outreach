@@ -37,19 +37,19 @@ import {
 } from '@/lib/analytics';
 
 interface FormData {
-  totalPatients: number;
+  totalLeads: number;
   ticketMedio: number;
   inactivePercent: number;
-  clinicName: string;
+  companyName: string;
   name: string;
   whatsapp: string;
   email: string;
 }
 
 interface FormErrors {
-  totalPatients?: string;
+  totalLeads?: string;
   ticketMedio?: string;
-  clinicName?: string;
+  companyName?: string;
   name?: string;
   whatsapp?: string;
   email?: string;
@@ -60,10 +60,10 @@ export default function Home() {
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
-    totalPatients: 0,
+    totalLeads: 0,
     ticketMedio: 0,
     inactivePercent: 40,
-    clinicName: '',
+    companyName: '',
     name: '',
     whatsapp: '+55 ',
     email: '',
@@ -79,14 +79,14 @@ export default function Home() {
 
   // Track lead started when user starts filling form
   useEffect(() => {
-    if (currentStep === 1 && (formData.totalPatients > 0 || formData.ticketMedio > 0)) {
+    if (currentStep === 1 && (formData.totalLeads > 0 || formData.ticketMedio > 0)) {
       trackLeadStarted();
     }
-  }, [currentStep, formData.totalPatients, formData.ticketMedio]);
+  }, [currentStep, formData.totalLeads, formData.ticketMedio]);
 
   // Calculate lost revenue
   const lostRevenue =
-    formData.totalPatients *
+    formData.totalLeads *
     (formData.inactivePercent / 100) *
     formData.ticketMedio;
 
@@ -102,8 +102,8 @@ export default function Home() {
   const validateStep1 = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.totalPatients || formData.totalPatients < 1) {
-      newErrors.totalPatients = 'Informe o total de pacientes';
+    if (!formData.totalLeads || formData.totalLeads < 1) {
+      newErrors.totalLeads = 'Informe o total de leads';
     }
 
     if (!formData.ticketMedio || formData.ticketMedio < 0.01) {
@@ -117,8 +117,8 @@ export default function Home() {
   const validateStep2 = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.clinicName || formData.clinicName.length < 2) {
-      newErrors.clinicName = 'Nome da clínica deve ter no mínimo 2 caracteres';
+    if (!formData.companyName || formData.companyName.length < 2) {
+      newErrors.companyName = 'Nome da empresa deve ter no mínimo 2 caracteres';
     }
 
     if (!formData.name || formData.name.length < 2) {
@@ -143,7 +143,7 @@ export default function Home() {
     if (currentStep === 1) {
       if (!validateStep1()) return;
       trackLeadStep1({
-        totalPatients: formData.totalPatients,
+        totalPatients: formData.totalLeads, // Keep for backward compatibility with analytics
         ticketMedio: formData.ticketMedio,
         inactivePercent: formData.inactivePercent,
         lostRevenue,
@@ -154,7 +154,7 @@ export default function Home() {
       if (!validateStep2()) return;
       
       trackLeadStep2({
-        clinicName: formData.clinicName,
+        clinicName: formData.companyName, // Keep for backward compatibility with analytics
         name: formData.name,
         email: formData.email,
         whatsapp: formData.whatsapp,
@@ -220,7 +220,7 @@ export default function Home() {
           <WizardStep key="step1" isActive={true} direction={direction}>
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <div className="w-14 h-14 bg-gradient-to-br from-slate-700 to-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
                   <Calculator className="w-7 h-7 text-white" />
                 </div>
                 <div>
@@ -228,28 +228,28 @@ export default function Home() {
                     Diagnóstico Inicial
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Veja o impacto dos pacientes inativos
+                    Veja o impacto dos leads inativos
                   </p>
                 </div>
               </div>
             </div>
 
             <NumberInput
-              id="totalPatients"
-              label="Total de Pacientes"
-              value={formData.totalPatients || ''}
+              id="totalLeads"
+              label="Total de Leads"
+              value={formData.totalLeads || ''}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  totalPatients: parseInt(e.target.value) || 0,
+                  totalLeads: parseInt(e.target.value) || 0,
                 })
               }
               placeholder="Ex: 500"
               required
               min={1}
-              error={errors.totalPatients}
+              error={errors.totalLeads}
               icon={<Users className="w-5 h-5" />}
-              helperText="Quantos pacientes você tem cadastrados?"
+              helperText="Quantos leads você tem cadastrados?"
             />
 
             <CurrencyInput
@@ -266,7 +266,7 @@ export default function Home() {
 
             <SliderInput
               id="inactivePercent"
-              label="Percentual de Pacientes Inativos"
+              label="Percentual de Leads Inativos"
               value={formData.inactivePercent}
               onChange={(value) =>
                 setFormData({ ...formData, inactivePercent: value })
@@ -274,7 +274,7 @@ export default function Home() {
               min={10}
               max={90}
               step={5}
-              helperText="Quantos % dos seus pacientes não voltam há mais de 6 meses?"
+              helperText="Quantos % dos seus leads não respondem há mais de 6 meses?"
             />
 
             <div className="flex gap-3 mt-6">
@@ -290,7 +290,7 @@ export default function Home() {
           <WizardStep key="step2" isActive={true} direction={direction}>
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <div className="w-14 h-14 bg-gradient-to-br from-slate-700 to-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
                   <User className="w-7 h-7 text-white" />
                 </div>
                 <div>
@@ -305,15 +305,15 @@ export default function Home() {
             </div>
 
             <TextInput
-              id="clinicName"
-              label="Nome da Clínica"
-              value={formData.clinicName}
+              id="companyName"
+              label="Nome da Empresa"
+              value={formData.companyName}
               onChange={(e) =>
-                setFormData({ ...formData, clinicName: e.target.value })
+                setFormData({ ...formData, companyName: e.target.value })
               }
-              placeholder="Clínica Odonto Excellence"
+              placeholder="Empresa Exemplo Ltda"
               required
-              error={errors.clinicName}
+              error={errors.companyName}
               icon={<Building2 className="w-5 h-5" />}
             />
 
@@ -403,28 +403,28 @@ export default function Home() {
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl">
                     <span className="text-2xl">😰</span>
                     <p className="text-sm text-red-800 font-medium">
-                      <span className="font-bold">{formData.inactivePercent}%</span> dos seus pacientes ({Math.round(formData.totalPatients * (formData.inactivePercent / 100))} pacientes) inativos há 6+ meses
+                      <span className="font-bold">{formData.inactivePercent}%</span> dos seus leads ({Math.round(formData.totalLeads * (formData.inactivePercent / 100))} leads) inativos há 6+ meses
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="relative bg-gradient-to-br from-emerald-50 via-teal-50 to-blue-50 border-2 border-emerald-200 rounded-2xl p-6 sm:p-8 overflow-hidden">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-200/20 rounded-full -mr-20 -mt-20"></div>
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-200/20 rounded-full -ml-16 -mb-16"></div>
+              <div className="relative bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 border-2 border-blue-200 rounded-2xl p-6 sm:p-8 overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-slate-200/20 rounded-full -ml-16 -mb-16"></div>
                 
                 <div className="relative z-10 text-center">
                   <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-16 h-16 bg-gradient-to-br from-slate-700 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <Sparkles className="w-9 h-9 text-white" />
                     </div>
                   </div>
                   
                   <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                    💡 Recupere Esses Pacientes!
+                    💡 Recupere Esses Leads!
                   </h3>
                   <p className="text-base sm:text-lg text-gray-700 mb-6 max-w-lg mx-auto">
-                    Veja as soluções que vão trazer esses pacientes de volta para sua clínica automaticamente
+                    Veja as soluções que vão trazer esses leads de volta para sua empresa automaticamente
                   </p>
 
                   <div className="bg-white/90 backdrop-blur-sm rounded-xl p-5 mb-6 shadow-md max-w-md mx-auto">
@@ -439,14 +439,14 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <Link href={`/precos?email=${encodeURIComponent(formData.email)}`}>
+                  <Link href="/dashboard">
                     <WizardButton>
-                      🚀 Ver Planos e Começar Grátis
+                      🚀 Acessar Dashboard
                     </WizardButton>
                   </Link>
                   
                   <p className="text-xs text-gray-600 mt-4">
-                    ✓ 3 planos disponíveis • ✓ Reative pacientes automaticamente • ✓ Mensagens com IA
+                    ✓ 3 planos disponíveis • ✓ Reative leads automaticamente • ✓ Mensagens com IA
                   </p>
                 </div>
               </div>
