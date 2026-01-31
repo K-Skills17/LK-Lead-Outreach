@@ -17,7 +17,7 @@ const webhookEventSchema = z.object({
     'campaign.completed',
   ]),
   lead_id: z.string().optional(),
-  data: z.record(z.string(), z.any()),
+  data: z.any(), // Using z.any() for flexible data structure
   timestamp: z.string().optional(),
 });
 
