@@ -221,7 +221,8 @@ export async function POST(request: NextRequest) {
 
           // Ensure status matches the CHECK constraint exactly
           // Valid values: 'draft', 'active', 'paused', 'completed'
-          const campaignStatus: 'draft' | 'active' | 'paused' | 'completed' = 'active';
+          // Using 'draft' as default since it's the safest option and matches the table default
+          const campaignStatus: 'draft' | 'active' | 'paused' | 'completed' = 'draft';
 
           const { data: newCampaign, error: campaignError } = await supabaseAdmin
             .from('campaigns')
