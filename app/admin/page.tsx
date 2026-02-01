@@ -21,6 +21,7 @@ import {
   Eye,
   Calendar,
   BarChart3,
+  MousePointerClick,
 } from 'lucide-react';
 
 interface SDR {
@@ -125,6 +126,9 @@ export default function AdminDashboard() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailContent, setEmailContent] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailHistory, setEmailHistory] = useState<any[]>([]);
+  const [emailStats, setEmailStats] = useState<any>(null);
+  const [loadingEmailHistory, setLoadingEmailHistory] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -156,6 +160,9 @@ export default function AdminDashboard() {
       
       // Load AI suggestions
       loadAISuggestions(token);
+      
+      // Load email history
+      loadEmailHistory(token);
     } catch (err) {
       console.error('Error loading overview:', err);
       setError('Failed to load data');
@@ -181,6 +188,27 @@ export default function AdminDashboard() {
       console.error('Error loading AI suggestions:', err);
     } finally {
       setLoadingSuggestions(false);
+    }
+  };
+
+  const loadEmailHistory = async (token: string) => {
+    try {
+      setLoadingEmailHistory(true);
+      const response = await fetch('/api/admin/emails/history', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setEmailHistory(result.emails || []);
+        setEmailStats(result.stats || null);
+      }
+    } catch (err) {
+      console.error('Error loading email history:', err);
+    } finally {
+      setLoadingEmailHistory(false);
     }
   };
 
