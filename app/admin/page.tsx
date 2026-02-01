@@ -408,7 +408,7 @@ export default function AdminDashboard() {
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'ai-strategist', label: 'AI Strategist', icon: Sparkles },
-              { id: 'ab-lab', label: 'A/B Lab', icon: Target, href: '/admin/ab-lab' },
+              { id: 'ab-lab', label: 'A/B Lab', icon: BarChart3, href: '/admin/ab-lab' },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = tab.href ? false : selectedTab === tab.id;
