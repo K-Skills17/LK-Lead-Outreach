@@ -221,21 +221,18 @@ export async function POST(request: NextRequest) {
 
           // Build campaign insert object with all required fields
           // The database requires: clinic_id, name, location (and possibly keyword)
+          // Always provide location and keyword to avoid NOT NULL violations
           const campaignInsert: {
             clinic_id: string;
             name: string;
             location: string;
-            keyword?: string;
+            keyword: string;
           } = {
             clinic_id: clinicId,
             name: campaignName,
             location: location, // REQUIRED - NOT NULL constraint
+            keyword: keyword, // Always provide keyword (may also be NOT NULL)
           };
-
-          // Add keyword if we have a valid value
-          if (keyword && keyword !== 'general') {
-            campaignInsert.keyword = keyword;
-          }
 
           // Don't set status - let database use default 'draft'
           // This ensures we never violate the CHECK constraint
