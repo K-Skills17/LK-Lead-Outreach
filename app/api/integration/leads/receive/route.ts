@@ -219,14 +219,18 @@ export async function POST(request: NextRequest) {
                           validated.country || 
                           'Unknown';
 
+          // Ensure status matches the CHECK constraint exactly
+          // Valid values: 'draft', 'active', 'paused', 'completed'
+          const campaignStatus: 'draft' | 'active' | 'paused' | 'completed' = 'active';
+
           const { data: newCampaign, error: campaignError } = await supabaseAdmin
             .from('campaigns')
             .insert({
               clinic_id: clinicId,
               name: campaignName,
-              status: 'active',
+              status: campaignStatus,
               keyword: keyword,
-              location: location, // Add location field
+              location: location,
             })
             .select('id')
             .single();
