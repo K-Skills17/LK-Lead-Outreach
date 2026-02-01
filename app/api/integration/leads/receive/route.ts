@@ -206,34 +206,35 @@ export async function POST(request: NextRequest) {
             console.log(`[Integration] ✅ Created clinic ${clinicId}`);
           }
 
-          // Build campaign insert object with only required fields
-          // Let database handle defaults for optional fields to avoid constraint violations
-          const campaignInsert: {
-            clinic_id: string;
-            name: string;
-            status?: 'draft' | 'active' | 'paused' | 'completed';
-            keyword?: string;
-            location?: string;
-          } = {
-            clinic_id: clinicId,
-            name: campaignName,
-          };
-
-          // Only add optional fields if they exist and are valid
           // Extract keyword from campaign name or use a default
+          // If campaign name contains a keyword (e.g., "Dentista RJ" -> "Dentista"), use it
+          // Otherwise, use the campaign name as keyword
           const keyword = validated.niche || validated.campaign_name || campaignName.split(' ')[0] || 'general';
-          if (keyword && keyword !== 'general') {
-            campaignInsert.keyword = keyword;
-          }
           
-          // Extract location from lead data or use a default
+          // Extract location from lead data - REQUIRED field (NOT NULL constraint)
+          // Priority: validated.location > validated.city > validated.state > validated.country > 'Unknown'
           const location = validated.location || 
                           validated.city || 
                           validated.state || 
                           validated.country || 
-                          null;
-          if (location && location !== 'Unknown') {
-            campaignInsert.location = location;
+                          'Unknown'; // Always provide a value since location is NOT NULL
+
+          // Build campaign insert object with all required fields
+          // The database requires: clinic_id, name, location (and possibly keyword)
+          const campaignInsert: {
+            clinic_id: string;
+            name: string;
+            location: string;
+            keyword?: string;
+          } = {
+            clinic_id: clinicId,
+            name: campaignName,
+            location: location, // REQUIRED - NOT NULL constraint
+          };
+
+          // Add keyword if we have a valid value
+          if (keyword && keyword !== 'general') {
+            campaignInsert.keyword = keyword;
           }
 
           // Don't set status - let database use default 'draft'
