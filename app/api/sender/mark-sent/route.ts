@@ -94,6 +94,42 @@ export async function POST(request: NextRequest) {
       .eq('id', validated.contactId)
       .single();
 
+    // FAILSAFE: Final check using system time/date before marking as sent
+    const { shouldSkipDay } = await import('@/lib/send-time-service');
+    const { isWithinWorkingHours, DEFAULT_HUMAN_BEHAVIOR_SETTINGS } = await import('@/lib/human-behavior-service');
+    
+    const systemNow = new Date();
+    const dayOfWeek = systemNow.getDay();
+    const currentHour = systemNow.getHours();
+    const currentMinute = systemNow.getMinutes();
+    
+    // FAILSAFE 1: Never mark as sent on weekends (using system time)
+    if (shouldSkipDay(dayOfWeek)) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      return NextResponse.json(
+        {
+          error: 'Weekend restriction',
+          message: `Cannot mark as sent on ${dayNames[dayOfWeek]}. Outreach is only allowed Monday-Friday.`,
+          currentDay: dayNames[dayOfWeek],
+          currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+        },
+        { status: 403 } // Forbidden
+      );
+    }
+    
+    // FAILSAFE 2: Check working hours (using system time)
+    if (!isWithinWorkingHours(DEFAULT_HUMAN_BEHAVIOR_SETTINGS, systemNow)) {
+      return NextResponse.json(
+        {
+          error: 'Outside working hours',
+          message: `Current time (${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}) is outside working hours (${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}).`,
+          currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+          workingHours: `${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}`,
+        },
+        { status: 403 } // Forbidden
+      );
+    }
+
     // Update contact status
     const { error } = await supabaseAdmin
       .from('campaign_contacts')

@@ -70,33 +70,43 @@ export async function POST(request: NextRequest) {
       settings?: HumanBehaviorSettings;
     };
 
-    const now = new Date();
-    const dayOfWeek = now.getDay();
+    // FAILSAFE: Use system time/date for all checks
+    const systemNow = new Date();
+    const dayOfWeek = systemNow.getDay();
+    const currentHour = systemNow.getHours();
+    const currentMinute = systemNow.getMinutes();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    // Skip weekends completely
+    // FAILSAFE 1: Skip weekends completely (using system time)
     if (shouldSkipDay(dayOfWeek)) {
       return NextResponse.json({
         success: true,
-        message: 'Skipped: Weekend (Saturday/Sunday)',
+        message: `Skipped: ${dayNames[dayOfWeek]} (weekend). Outreach only allowed Monday-Friday.`,
         processed: 0,
         skipped: 0,
+        currentDay: dayNames[dayOfWeek],
+        currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+        systemDate: systemNow.toISOString(),
       });
     }
 
-    // Check working hours
-    if (!isWithinWorkingHours(settings, now)) {
-      const timeUntil = getTimeUntilWorkingHours(settings, now);
+    // FAILSAFE 2: Check working hours (using system time)
+    if (!isWithinWorkingHours(settings, systemNow)) {
+      const timeUntil = getTimeUntilWorkingHours(settings, systemNow);
       return NextResponse.json({
         success: true,
-        message: 'Outside working hours',
+        message: `Outside working hours. Current time: ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}. Working hours: ${settings.startTime} - ${settings.endTime}.`,
         processed: 0,
         skipped: 0,
+        currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+        workingHours: `${settings.startTime} - ${settings.endTime}`,
         timeUntilWorkingHours: timeUntil,
+        systemDate: systemNow.toISOString(),
       });
     }
 
-    // Check daily message limit
-    const dailyCount = await getDailyMessageCount(sdrId, campaignId, now);
+    // Check daily message limit (using system date)
+    const dailyCount = await getDailyMessageCount(sdrId, campaignId, systemNow);
     if (dailyCount >= settings.dailyLimit) {
       return NextResponse.json({
         success: true,
@@ -113,7 +123,7 @@ export async function POST(request: NextRequest) {
       .from('campaign_contacts')
       .select('id, nome, empresa, phone, email, assigned_sdr_id, campaign_id, scheduled_send_at, personalized_message')
       .eq('status', 'pending')
-      .lte('scheduled_send_at', now.toISOString())
+      .lte('scheduled_send_at', systemNow.toISOString())
       .order('created_at', { ascending: true })
       .limit(maxMessages * 2); // Fetch more to account for filtering
 

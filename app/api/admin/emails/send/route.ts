@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check contact frequency (respect days since last contact)
-    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS } = await import('@/lib/human-behavior-service');
+    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS, isWithinWorkingHours } = await import('@/lib/human-behavior-service');
+    const { shouldSkipDay } = await import('@/lib/send-time-service');
+    
     const contactCheck = await canContactLead(null, contact.email, DEFAULT_HUMAN_BEHAVIOR_SETTINGS.daysSinceLastContact);
     
     if (!contactCheck.canContact) {
@@ -74,9 +76,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check optimal send time (skip weekends, limit Mon/Fri)
-    const { calculateOptimalSendTime } = await import('@/lib/send-time-service');
+    // FAILSAFE: Check system time/date before sending
+    
     const now = new Date();
+    const dayOfWeek = now.getDay();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // FAILSAFE 1: Never send on weekends (using system time)
+    if (shouldSkipDay(dayOfWeek)) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      return NextResponse.json(
+        {
+          error: 'Weekend restriction',
+          message: `Cannot send on ${dayNames[dayOfWeek]}. Outreach is only allowed Monday-Friday.`,
+          currentDay: dayNames[dayOfWeek],
+          currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+        },
+        { status: 403 } // Forbidden
+      );
+    }
+    
+    // FAILSAFE 2: Check working hours (using system time)
+    if (!isWithinWorkingHours(DEFAULT_HUMAN_BEHAVIOR_SETTINGS, now)) {
+      return NextResponse.json(
+        {
+          error: 'Outside working hours',
+          message: `Current time (${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}) is outside working hours (${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}).`,
+          currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+          workingHours: `${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}`,
+        },
+        { status: 403 } // Forbidden
+      );
+    }
+    
+    // Check optimal send time (skip weekends, limit Mon/Fri) - for logging/recommendation
+    const { calculateOptimalSendTime } = await import('@/lib/send-time-service');
     const sendTimeResult = await calculateOptimalSendTime({
       contactId: contact.id,
       businessType: 'general',
@@ -84,8 +119,7 @@ export async function POST(request: NextRequest) {
       timezone: 'America/Sao_Paulo',
     });
     
-    // If optimal time is in the future, schedule it (but allow immediate send if admin wants)
-    // For now, we'll allow immediate sends but log the optimal time
+    // Log optimal time (but allow immediate send since we already passed failsafe checks)
     
     // Send email via Resend
     const fromEmail = validated.fromEmail || process.env.EMAIL_FROM || 'LK Lead Outreach <noreply@lkdigital.org>';

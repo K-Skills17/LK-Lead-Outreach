@@ -119,13 +119,44 @@ export async function GET(request: NextRequest) {
     }
 
     // Import human behavior service
-    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS } = await import('@/lib/human-behavior-service');
+    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS, isWithinWorkingHours } = await import('@/lib/human-behavior-service');
     const { shouldSkipDay } = await import('@/lib/send-time-service');
+    
+    // FAILSAFE: Check system time/date before returning queue
+    const systemNow = new Date();
+    const dayOfWeek = systemNow.getDay();
+    const currentHour = systemNow.getHours();
+    const currentMinute = systemNow.getMinutes();
+    
+    // FAILSAFE 1: Never return queue on weekends (using system time)
+    if (shouldSkipDay(dayOfWeek)) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      return NextResponse.json({
+        contacts: [],
+        count: 0,
+        total: 0,
+        message: `Queue blocked: ${dayNames[dayOfWeek]} (weekend). Outreach only allowed Monday-Friday.`,
+        currentDay: dayNames[dayOfWeek],
+        currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+      });
+    }
+    
+    // FAILSAFE 2: Check working hours (using system time)
+    if (!isWithinWorkingHours(DEFAULT_HUMAN_BEHAVIOR_SETTINGS, systemNow)) {
+      return NextResponse.json({
+        contacts: [],
+        count: 0,
+        total: 0,
+        message: `Queue blocked: Outside working hours (${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}). Working hours: ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}.`,
+        currentTime: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`,
+        workingHours: `${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.startTime} - ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.endTime}`,
+      });
+    }
     
     // Filter leads with multiple checks:
     // 1. Scheduled send time has passed
     // 2. Contact frequency check (days since last contact)
-    // 3. Day-of-week check (skip weekends, limit Mon/Fri)
+    // 3. Day-of-week check (skip weekends, limit Mon/Fri) - already checked above
     const readyContacts = [];
     
     for (const cc of contacts || []) {
@@ -135,13 +166,6 @@ export async function GET(request: NextRequest) {
         if (scheduledTime > now) {
           continue; // Not ready yet
         }
-      }
-      
-      // Check day of week (skip weekends completely)
-      const today = new Date();
-      const dayOfWeek = today.getDay();
-      if (shouldSkipDay(dayOfWeek)) {
-        continue; // Skip weekends
       }
       
       // Check contact frequency
