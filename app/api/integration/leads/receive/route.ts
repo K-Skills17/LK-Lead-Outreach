@@ -210,6 +210,14 @@ export async function POST(request: NextRequest) {
           // If campaign name contains a keyword (e.g., "Dentista RJ" -> "Dentista"), use it
           // Otherwise, use the campaign name as keyword
           const keyword = validated.niche || validated.campaign_name || campaignName.split(' ')[0] || 'general';
+          
+          // Extract location from lead data or use a default
+          // Priority: validated.location > validated.city > validated.state > validated.country > 'Unknown'
+          const location = validated.location || 
+                          validated.city || 
+                          validated.state || 
+                          validated.country || 
+                          'Unknown';
 
           const { data: newCampaign, error: campaignError } = await supabaseAdmin
             .from('campaigns')
@@ -217,7 +225,8 @@ export async function POST(request: NextRequest) {
               clinic_id: clinicId,
               name: campaignName,
               status: 'active',
-              keyword: keyword, // Add keyword field
+              keyword: keyword,
+              location: location, // Add location field
             })
             .select('id')
             .single();
