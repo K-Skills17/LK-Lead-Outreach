@@ -80,9 +80,11 @@ For each suggestion, provide:
 Focus on:
 - Personalization improvements (if personalization scores are low or missing)
 - A/B testing opportunities (if no tests are running)
-- Send time optimization (if send times aren't optimized)
+- Send time optimization (ALWAYS include if send times aren't optimized or if many leads lack optimal send times - this is critical for maximizing open rates)
 - Campaign organization (if many unassigned leads)
 - Lead quality improvements (if tier distribution is poor)
+
+IMPORTANT: If send time data shows that many leads don't have optimal send times configured, you MUST include a suggestion titled "Definir Horários de Envio Eficazes" with category "send_time". This is a critical optimization that directly impacts email open rates.
 
 Return ONLY a valid JSON object with a "suggestions" array in this format:
 {
@@ -129,9 +131,21 @@ Return ONLY a valid JSON object with a "suggestions" array in this format:
     }
 
     // Validate each suggestion has required fields
-    return suggestions
+    const validSuggestions = suggestions
       .filter((s: any) => s.title && s.impact && s.description && s.recommendedAction)
       .slice(0, 5); // Max 5 suggestions
+    
+    // Ensure send time suggestion is included if relevant (merge with fallback if missing)
+    const hasSendTimeSuggestion = validSuggestions.some((s: any) => s.category === 'send_time');
+    if (!hasSendTimeSuggestion) {
+      const sendTimeFallback = getFallbackSuggestions(analysisData).find((s) => s.category === 'send_time');
+      if (sendTimeFallback && (analysisData.sendTimeStats.withoutOptimalTime > 0 || analysisData.sendTimeStats.avgConfidence < 70)) {
+        // Add send time suggestion if it's relevant
+        validSuggestions.push(sendTimeFallback);
+      }
+    }
+    
+    return validSuggestions.slice(0, 5); // Max 5 suggestions
   } catch (error) {
     console.error('[AI Strategist] Error generating suggestions:', error);
     return getFallbackSuggestions(analysisData);
@@ -188,13 +202,29 @@ function getFallbackSuggestions(data: CampaignAnalysisData): AIStrategySuggestio
     });
   }
 
-  // Send Time suggestion
-  if (data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime) {
+  // Send Time suggestion - Always show if there are leads without optimal send times
+  // Also show if confidence scores are low (below 70)
+  const needsSendTimeOptimization = 
+    data.sendTimeStats.withoutOptimalTime > 0 || 
+    (data.sendTimeStats.withOptimalTime > 0 && data.sendTimeStats.avgConfidence < 70);
+  
+  if (needsSendTimeOptimization) {
+    const impact = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime ? 'HIGH' : 'MEDIUM';
+    const description = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime
+      ? `A maioria dos leads (${data.sendTimeStats.withoutOptimalTime}) não possui horários de envio otimizados, o que reduz significativamente as taxas de abertura.`
+      : data.sendTimeStats.avgConfidence < 70
+      ? `Os horários de envio estão configurados, mas com baixa confiança (${data.sendTimeStats.avgConfidence}%). Otimizar os horários pode aumentar as taxas de abertura.`
+      : 'A ausência de dados sobre melhores horários de envio impede a maximização de aberturas.';
+    
+    const recommendedAction = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime
+      ? 'Configurar horários de envio otimizados para todos os leads pendentes. O sistema já calcula automaticamente os melhores horários baseado em dia da semana (prioriza terça-quinta, evita fins de semana) e histórico de aberturas.'
+      : 'Revisar e otimizar os horários de envio existentes. O sistema pode recalcular horários otimizados baseado em dados históricos de abertura e padrões de comportamento.';
+    
     suggestions.push({
       title: 'Definir Horários de Envio Eficazes',
-      impact: 'MEDIUM',
-      description: 'A ausência de dados sobre melhores horários de envio impede a maximização de aberturas.',
-      recommendedAction: 'Realizar uma análise para determinar os melhores horários de envio, possivelmente testando envios em diferentes dias e horários da semana.',
+      impact,
+      description,
+      recommendedAction,
       category: 'send_time',
     });
   }
