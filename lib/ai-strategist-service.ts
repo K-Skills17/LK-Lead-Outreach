@@ -131,19 +131,32 @@ Return ONLY a valid JSON object with a "suggestions" array in this format:
     }
 
     // Validate each suggestion has required fields
-    const validSuggestions = suggestions
-      .filter((s: any) => s.title && s.impact && s.description && s.recommendedAction)
-      .slice(0, 5); // Max 5 suggestions
+    let validSuggestions = suggestions
+      .filter((s: any) => s.title && s.impact && s.description && s.recommendedAction);
     
     // Ensure send time suggestion is included if relevant (merge with fallback if missing)
     const hasSendTimeSuggestion = validSuggestions.some((s: any) => s.category === 'send_time');
-    if (!hasSendTimeSuggestion) {
+    const needsSendTimeSuggestion = analysisData.sendTimeStats.withoutOptimalTime > 0 || 
+                                    (analysisData.sendTimeStats.withOptimalTime > 0 && analysisData.sendTimeStats.avgConfidence < 70);
+    
+    if (!hasSendTimeSuggestion && needsSendTimeSuggestion) {
       const sendTimeFallback = getFallbackSuggestions(analysisData).find((s) => s.category === 'send_time');
-      if (sendTimeFallback && (analysisData.sendTimeStats.withoutOptimalTime > 0 || analysisData.sendTimeStats.avgConfidence < 70)) {
-        // Add send time suggestion if it's relevant
-        validSuggestions.push(sendTimeFallback);
+      if (sendTimeFallback) {
+        // Add send time suggestion at the beginning to ensure visibility
+        validSuggestions = [sendTimeFallback, ...validSuggestions];
       }
     }
+    
+    // Sort by impact (HIGH first) to ensure important suggestions appear first
+    const impactOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    validSuggestions.sort((a: any, b: any) => {
+      const impactDiff = impactOrder[a.impact as keyof typeof impactOrder] - impactOrder[b.impact as keyof typeof impactOrder];
+      if (impactDiff !== 0) return impactDiff;
+      // If same impact, prioritize send_time category
+      if (a.category === 'send_time' && b.category !== 'send_time') return -1;
+      if (b.category === 'send_time' && a.category !== 'send_time') return 1;
+      return 0;
+    });
     
     return validSuggestions.slice(0, 5); // Max 5 suggestions
   } catch (error) {
@@ -203,22 +216,35 @@ function getFallbackSuggestions(data: CampaignAnalysisData): AIStrategySuggestio
   }
 
   // Send Time suggestion - Always show if there are leads without optimal send times
-  // Also show if confidence scores are low (below 70)
+  // Also show if confidence scores are low (below 70) OR if we have leads but no optimal times at all
   const needsSendTimeOptimization = 
     data.sendTimeStats.withoutOptimalTime > 0 || 
-    (data.sendTimeStats.withOptimalTime > 0 && data.sendTimeStats.avgConfidence < 70);
+    (data.sendTimeStats.withOptimalTime > 0 && data.sendTimeStats.avgConfidence < 70) ||
+    (data.totalLeads > 0 && data.sendTimeStats.withOptimalTime === 0); // Show if we have leads but no optimal times at all
   
-  if (needsSendTimeOptimization) {
-    const impact = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime ? 'HIGH' : 'MEDIUM';
-    const description = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime
-      ? `A maioria dos leads (${data.sendTimeStats.withoutOptimalTime}) não possui horários de envio otimizados, o que reduz significativamente as taxas de abertura.`
-      : data.sendTimeStats.avgConfidence < 70
-      ? `Os horários de envio estão configurados, mas com baixa confiança (${data.sendTimeStats.avgConfidence}%). Otimizar os horários pode aumentar as taxas de abertura.`
-      : 'A ausência de dados sobre melhores horários de envio impede a maximização de aberturas.';
+  if (needsSendTimeOptimization || data.totalLeads > 0) {
+    // Determine impact and description based on data
+    let impact: 'HIGH' | 'MEDIUM' = 'MEDIUM';
+    let description = '';
+    let recommendedAction = '';
     
-    const recommendedAction = data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime
-      ? 'Configurar horários de envio otimizados para todos os leads pendentes. O sistema já calcula automaticamente os melhores horários baseado em dia da semana (prioriza terça-quinta, evita fins de semana) e histórico de aberturas.'
-      : 'Revisar e otimizar os horários de envio existentes. O sistema pode recalcular horários otimizados baseado em dados históricos de abertura e padrões de comportamento.';
+    if (data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime) {
+      impact = 'HIGH';
+      description = `A maioria dos leads (${data.sendTimeStats.withoutOptimalTime}) não possui horários de envio otimizados, o que reduz significativamente as taxas de abertura.`;
+      recommendedAction = 'Configurar horários de envio otimizados para todos os leads pendentes. O sistema já calcula automaticamente os melhores horários baseado em dia da semana (prioriza terça-quinta, evita fins de semana) e histórico de aberturas.';
+    } else if (data.sendTimeStats.avgConfidence < 70 && data.sendTimeStats.withOptimalTime > 0) {
+      impact = 'MEDIUM';
+      description = `Os horários de envio estão configurados, mas com baixa confiança (${data.sendTimeStats.avgConfidence}%). Otimizar os horários pode aumentar as taxas de abertura.`;
+      recommendedAction = 'Revisar e otimizar os horários de envio existentes. O sistema pode recalcular horários otimizados baseado em dados históricos de abertura e padrões de comportamento.';
+    } else if (data.totalLeads > 0 && data.sendTimeStats.withOptimalTime === 0) {
+      impact = 'HIGH';
+      description = `Nenhum lead possui horários de envio otimizados configurados. Configurar horários eficazes é essencial para maximizar as taxas de abertura de emails.`;
+      recommendedAction = 'Ativar a otimização de horários de envio para todos os leads. O sistema calcula automaticamente os melhores horários baseado em: dia da semana (prioriza terça-quinta-feira, evita fins de semana), histórico de aberturas, e tipo de negócio.';
+    } else {
+      impact = 'MEDIUM';
+      description = 'Otimizar horários de envio pode melhorar significativamente as taxas de abertura. O sistema já implementa lógica para evitar fins de semana e priorizar terça-quinta-feira.';
+      recommendedAction = 'Revisar os horários de envio configurados e garantir que todos os leads pendentes tenham horários otimizados calculados automaticamente pelo sistema.';
+    }
     
     suggestions.push({
       title: 'Definir Horários de Envio Eficazes',
