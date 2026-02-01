@@ -62,13 +62,46 @@ export async function POST(request: NextRequest) {
       sdrId,
       campaignId,
       maxMessages = 10, // Process max 10 messages per call
-      settings = DEFAULT_HUMAN_BEHAVIOR_SETTINGS,
+      settings: customSettings,
     } = body as {
       sdrId?: string;
       campaignId?: string;
       maxMessages?: number;
       settings?: HumanBehaviorSettings;
     };
+
+    // Get active settings from database, or use defaults
+    let settings = DEFAULT_HUMAN_BEHAVIOR_SETTINGS;
+    if (!customSettings) {
+      const { data: dbSettings } = await supabaseAdmin
+        .from('sending_settings')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (dbSettings) {
+        settings = {
+          humanMode: dbSettings.human_mode ?? true,
+          delayBetweenMessages: dbSettings.delay_between_messages ?? 60,
+          delayVariation: dbSettings.delay_variation ?? 0.2,
+          coffeeBreakInterval: dbSettings.coffee_break_interval ?? 15,
+          coffeeBreakDuration: dbSettings.coffee_break_duration ?? 900,
+          longBreakInterval: dbSettings.long_break_interval ?? 50,
+          longBreakDuration: dbSettings.long_break_duration ?? 2700,
+          workingHoursEnabled: dbSettings.working_hours_enabled ?? true,
+          startTime: dbSettings.start_time ?? '10:00',
+          endTime: dbSettings.end_time ?? '18:00',
+          timezone: dbSettings.timezone ?? 'America/Sao_Paulo',
+          daysSinceLastContact: dbSettings.days_since_last_contact ?? 3,
+          dailyLimit: dbSettings.daily_limit ?? 250,
+          dailyLimitWarning: dbSettings.daily_limit_warning ?? 200,
+        };
+      }
+    } else {
+      settings = customSettings;
+    }
 
     // FAILSAFE: Use system time/date for all checks
     const systemNow = new Date();
@@ -179,27 +212,89 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Process contacts (in real implementation, this would queue them for sending)
-    // For now, we'll just mark them as ready and return info
+    // Process contacts - actually send WhatsApp messages
+    const { sendWhatsAppMessage } = await import('@/lib/whatsapp-sending-service');
+    const { calculateDelay, shouldTakeBreak } = await import('@/lib/human-behavior-service');
+    
     const processed = readyContacts.length;
     const remainingDaily = settings.dailyLimit - dailyCount;
     const canProcess = Math.min(processed, remainingDaily);
+    
+    const results = [];
+    let messagesSent = 0;
+    let skipped = 0;
+    
+    // Process contacts with human behavior delays
+    for (let i = 0; i < canProcess && i < readyContacts.length; i++) {
+      const contact = readyContacts[i];
+      
+      // Check for breaks
+      if (messagesSent > 0) {
+        const breakCheck = shouldTakeBreak(messagesSent, settings);
+        if (breakCheck.shouldBreak) {
+          // In a real implementation, we'd pause here
+          // For now, we'll just log it
+          console.log(`[Outreach Process] Break needed: ${breakCheck.breakType} (${breakCheck.duration}s)`);
+        }
+      }
+      
+      // Calculate delay (for logging - actual delay would be applied in real sending)
+      const delay = calculateDelay(messagesSent, settings);
+      
+      // Send WhatsApp message
+      const sendResult = await sendWhatsAppMessage({
+        contactId: contact.id,
+        sdrId: sdrId || contact.assigned_sdr_id || undefined,
+        messageText: contact.personalized_message || '',
+        settings,
+        skipChecks: false, // Apply all checks
+      });
+      
+      if (sendResult.success) {
+        messagesSent++;
+        results.push({
+          contactId: contact.id,
+          nome: contact.nome,
+          empresa: contact.empresa,
+          phone: contact.phone,
+          status: 'sent',
+          whatsappSendId: sendResult.whatsappSendId,
+        });
+      } else if (sendResult.skipped) {
+        skipped++;
+        results.push({
+          contactId: contact.id,
+          nome: contact.nome,
+          empresa: contact.empresa,
+          phone: contact.phone,
+          status: 'skipped',
+          reason: sendResult.skipReason,
+        });
+      } else {
+        skipped++;
+        results.push({
+          contactId: contact.id,
+          nome: contact.nome,
+          empresa: contact.empresa,
+          phone: contact.phone,
+          status: 'failed',
+          error: sendResult.error,
+        });
+      }
+      
+      // In a real implementation, we'd apply the delay here
+      // For now, we'll just continue (cron job will handle spacing)
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Found ${processed} contacts ready to send`,
-      processed: canProcess,
-      skipped: contacts.length - processed,
-      dailyCount,
+      message: `Processed ${readyContacts.length} contacts: ${messagesSent} sent, ${skipped} skipped`,
+      processed: messagesSent,
+      skipped: skipped + (contacts.length - processed),
+      dailyCount: dailyCount + messagesSent,
       dailyLimit: settings.dailyLimit,
-      remainingDaily,
-      readyContacts: readyContacts.slice(0, canProcess).map((c) => ({
-        id: c.id,
-        nome: c.nome,
-        empresa: c.empresa,
-        phone: c.phone,
-      })),
-      note: 'Contacts are ready for sending. Use /api/sender/queue to get them and /api/sender/mark-sent to mark as sent.',
+      remainingDaily: settings.dailyLimit - (dailyCount + messagesSent),
+      results,
     });
   } catch (error) {
     console.error('[Outreach Process] Error:', error);

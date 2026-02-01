@@ -22,6 +22,11 @@ import {
   Calendar,
   BarChart3,
   MousePointerClick,
+  Play,
+  Pause,
+  Square,
+  Settings,
+  Send,
 } from 'lucide-react';
 
 interface SDR {
@@ -114,7 +119,7 @@ export default function AdminDashboard() {
   const [authToken, setAuthToken] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns' | 'emails' | 'whatsapp'>('overview');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns' | 'emails' | 'whatsapp' | 'sending'>('overview');
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [assignSdrId, setAssignSdrId] = useState('');
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -133,6 +138,12 @@ export default function AdminDashboard() {
   const [whatsappHistory, setWhatsappHistory] = useState<any[]>([]);
   const [whatsappStats, setWhatsappStats] = useState<any>(null);
   const [loadingWhatsappHistory, setLoadingWhatsappHistory] = useState(false);
+  const [sendingState, setSendingState] = useState<any>(null);
+  const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [sendingSettings, setSendingSettings] = useState<any[]>([]);
+  const [loadingSending, setLoadingSending] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [editingSettings, setEditingSettings] = useState<any>(null);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -140,6 +151,19 @@ export default function AdminDashboard() {
       setAuthToken(savedToken);
       setIsAuthenticated(true);
       loadOverview(savedToken);
+      loadSendingControl(savedToken);
+      loadQueueStatus(savedToken);
+      loadSendingSettings(savedToken);
+      
+      // Poll for updates every 10 seconds
+      const interval = setInterval(() => {
+        if (savedToken) {
+          loadSendingControl(savedToken);
+          loadQueueStatus(savedToken);
+        }
+      }, 10000);
+      
+      return () => clearInterval(interval);
     }
   }, []);
 
@@ -215,6 +239,84 @@ export default function AdminDashboard() {
       console.error('Error loading email history:', err);
     } finally {
       setLoadingEmailHistory(false);
+    }
+  };
+
+  const loadSendingControl = async (token: string) => {
+    try {
+      const response = await fetch('/api/admin/sending/control', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSendingState(result);
+      }
+    } catch (err) {
+      console.error('Error loading sending control:', err);
+    }
+  };
+
+  const loadQueueStatus = async (token: string) => {
+    try {
+      const response = await fetch('/api/admin/sending/queue', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setQueueStatus(result);
+      }
+    } catch (err) {
+      console.error('Error loading queue status:', err);
+    }
+  };
+
+  const loadSendingSettings = async (token: string) => {
+    try {
+      const response = await fetch('/api/admin/sending/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSendingSettings(result.settings || []);
+      }
+    } catch (err) {
+      console.error('Error loading sending settings:', err);
+    }
+  };
+
+  const handleSendingAction = async (action: 'start' | 'stop' | 'pause' | 'resume', pauseDuration?: number) => {
+    try {
+      setLoadingSending(true);
+      const response = await fetch('/api/admin/sending/control', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, pauseDuration }),
+      });
+
+      if (response.ok) {
+        await loadSendingControl(authToken);
+        await loadQueueStatus(authToken);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to perform action');
+      }
+    } catch (err) {
+      console.error('Error performing sending action:', err);
+      alert('Failed to perform action');
+    } finally {
+      setLoadingSending(false);
     }
   };
 
@@ -694,7 +796,7 @@ export default function AdminDashboard() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
           <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-blue-50/30">
             <div className="flex space-x-2 px-6">
-              {(['overview', 'sdrs', 'leads', 'campaigns', 'emails', 'whatsapp'] as const).map((tab) => (
+              {(['overview', 'sdrs', 'leads', 'campaigns', 'emails', 'whatsapp', 'sending'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setSelectedTab(tab)}
@@ -1206,6 +1308,255 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Sending Control Tab */}
+            {selectedTab === 'sending' && (
+              <div className="space-y-6">
+                {/* Control Panel */}
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl shadow-xl border border-blue-200/50 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Sending Control</h3>
+                      <p className="text-sm text-gray-600">Manage automated email and WhatsApp sending</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {sendingState?.isRunning ? (
+                        <>
+                          {sendingState.isPaused ? (
+                            <button
+                              onClick={() => handleSendingAction('resume')}
+                              disabled={loadingSending}
+                              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                            >
+                              <Play className="w-5 h-5" />
+                              {loadingSending ? 'Resuming...' : 'Resume'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSendingAction('pause')}
+                              disabled={loadingSending}
+                              className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                            >
+                              <Pause className="w-5 h-5" />
+                              {loadingSending ? 'Pausing...' : 'Pause'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleSendingAction('stop')}
+                            disabled={loadingSending}
+                            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                          >
+                            <Square className="w-5 h-5" />
+                            {loadingSending ? 'Stopping...' : 'Stop'}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleSendingAction('start')}
+                          disabled={loadingSending}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                        >
+                          <Play className="w-5 h-5" />
+                          {loadingSending ? 'Starting...' : 'Start Sending'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          // Load default settings or existing active settings
+                          const defaultSettings = sendingSettings.find((s: any) => s.is_active) || {
+                            humanMode: true,
+                            delayBetweenMessages: 60,
+                            delayVariation: 0.2,
+                            coffeeBreakInterval: 15,
+                            coffeeBreakDuration: 900,
+                            longBreakInterval: 50,
+                            longBreakDuration: 2700,
+                            workingHoursEnabled: true,
+                            startTime: '10:00',
+                            endTime: '18:00',
+                            daysSinceLastContact: 3,
+                            dailyLimit: 250,
+                            whatsappEnabled: true,
+                            emailEnabled: true,
+                          };
+                          setEditingSettings(defaultSettings);
+                          setShowSettingsModal(true);
+                        }}
+                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2 font-semibold"
+                      >
+                        <Settings className="w-5 h-5" />
+                        Settings
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Status Display */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          sendingState?.isRunning
+                            ? sendingState.isPaused
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {sendingState?.isRunning
+                            ? sendingState.isPaused
+                              ? '⏸ Paused'
+                              : '▶ Running'
+                            : '⏹ Stopped'}
+                        </span>
+                      </div>
+                      {sendingState?.sessionStartedAt && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Started: {formatDate(sendingState.sessionStartedAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Today</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {sendingState?.messagesSentToday || 0}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Limit: {queueStatus?.dailyLimit || 250}
+                      </p>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">This Session</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {sendingState?.messagesSentSession || 0}
+                        </span>
+                      </div>
+                      {sendingState?.lastMessageSentAt && (
+                        <p className="text-xs text-gray-500">
+                          Last: {formatDate(sendingState.lastMessageSentAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Queue Status */}
+                  {queueStatus && (
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <h4 className="font-semibold text-gray-900 mb-3">Queue Status</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Ready to Send</p>
+                          <p className="text-2xl font-bold text-green-600">{queueStatus.readyToSend || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Total Pending</p>
+                          <p className="text-2xl font-bold text-gray-900">{queueStatus.totalPending || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Remaining Today</p>
+                          <p className="text-2xl font-bold text-blue-600">{queueStatus.remainingDaily || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Skipped</p>
+                          <p className="text-lg font-semibold text-orange-600">
+                            {queueStatus.skipped?.tooRecent || 0} recent, {queueStatus.skipped?.weekend || 0} weekend
+                          </p>
+                        </div>
+                      </div>
+                      {queueStatus.isWeekend && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            ⚠️ Weekend detected - Sending is paused until Monday
+                          </p>
+                        </div>
+                      )}
+                      {queueStatus.isWorkingHours === false && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800">
+                            ⏰ Outside working hours - Sending will resume at {queueStatus.controlState?.pausedUntil ? formatDate(queueStatus.controlState.pausedUntil) : '10:00'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Trigger Section */}
+                <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Manual Trigger</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoadingSending(true);
+                          const response = await fetch('/api/outreach/process', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${authToken}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ maxMessages: 10 }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            alert(`Processed ${result.processed} messages. ${result.skipped} skipped.`);
+                            await loadQueueStatus(authToken);
+                            await loadSendingControl(authToken);
+                          } else {
+                            alert(result.error || 'Failed to process');
+                          }
+                        } catch (err) {
+                          alert('Failed to trigger sending');
+                        } finally {
+                          setLoadingSending(false);
+                        }
+                      }}
+                      disabled={loadingSending}
+                      className="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                    >
+                      <Send className="w-5 h-5" />
+                      {loadingSending ? 'Processing...' : 'Process Queue Now (10 messages)'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoadingSending(true);
+                          const response = await fetch('/api/outreach/process', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${authToken}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ maxMessages: 50 }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            alert(`Processed ${result.processed} messages. ${result.skipped} skipped.`);
+                            await loadQueueStatus(authToken);
+                            await loadSendingControl(authToken);
+                          } else {
+                            alert(result.error || 'Failed to process');
+                          }
+                        } catch (err) {
+                          alert('Failed to trigger sending');
+                        } finally {
+                          setLoadingSending(false);
+                        }
+                      }}
+                      disabled={loadingSending}
+                      className="px-6 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                    >
+                      <Send className="w-5 h-5" />
+                      {loadingSending ? 'Processing...' : 'Process Queue Now (50 messages)'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Campaigns Tab */}
             {selectedTab === 'campaigns' && (
               <div>
@@ -1499,6 +1850,259 @@ export default function AdminDashboard() {
                   setAssignSdrId('');
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sending Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Sending Cadence Settings</h3>
+              <button
+                onClick={() => {
+                  setShowSettingsModal(false);
+                  setEditingSettings(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Delay Settings */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Delay Between Messages</h4>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={editingSettings?.humanMode !== false}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, humanMode: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Human Mode (60-210 seconds random delay)</span>
+                  </label>
+                  {editingSettings?.humanMode === false && (
+                    <div className="ml-7 space-y-2">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Base Delay (seconds)</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="600"
+                          value={editingSettings?.delayBetweenMessages || 60}
+                          onChange={(e) => setEditingSettings({ ...editingSettings, delayBetweenMessages: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Variation (±%)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={(editingSettings?.delayVariation || 0.2) * 100}
+                          onChange={(e) => setEditingSettings({ ...editingSettings, delayVariation: parseFloat(e.target.value) / 100 })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Break Settings */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Break Settings</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Coffee Break (every N messages)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={editingSettings?.coffeeBreakInterval || 15}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, coffeeBreakInterval: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Coffee Break Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={(editingSettings?.coffeeBreakDuration || 900) / 60}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, coffeeBreakDuration: parseInt(e.target.value) * 60 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Long Break (every N messages)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={editingSettings?.longBreakInterval || 50}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, longBreakInterval: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Long Break Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={(editingSettings?.longBreakDuration || 2700) / 60}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, longBreakDuration: parseInt(e.target.value) * 60 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Working Hours */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Working Hours</h4>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={editingSettings?.workingHoursEnabled !== false}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, workingHoursEnabled: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Enable Working Hours Restriction</span>
+                  </label>
+                  {editingSettings?.workingHoursEnabled !== false && (
+                    <div className="grid grid-cols-2 gap-4 ml-7">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Start Time</label>
+                        <input
+                          type="time"
+                          value={editingSettings?.startTime || '10:00'}
+                          onChange={(e) => setEditingSettings({ ...editingSettings, startTime: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">End Time</label>
+                        <input
+                          type="time"
+                          value={editingSettings?.endTime || '18:00'}
+                          onChange={(e) => setEditingSettings({ ...editingSettings, endTime: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Contact Frequency & Limits */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Contact Frequency & Limits</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Days Between Contacts</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={editingSettings?.daysSinceLastContact || 3}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, daysSinceLastContact: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Daily Limit</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={editingSettings?.dailyLimit || 250}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, dailyLimit: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Channel Settings */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Channels</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={editingSettings?.whatsappEnabled !== false}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, whatsappEnabled: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Enable WhatsApp Sending</span>
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={editingSettings?.emailEnabled !== false}
+                      onChange={(e) => setEditingSettings({ ...editingSettings, emailEnabled: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Enable Email Sending</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+              <button
+                onClick={async () => {
+                  try {
+                    setLoadingSending(true);
+                    const response = await fetch('/api/admin/sending/settings', {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(editingSettings || {}),
+                    });
+
+                    if (response.ok) {
+                      await loadSendingSettings(authToken);
+                      setShowSettingsModal(false);
+                      setEditingSettings(null);
+                      alert('Settings saved successfully!');
+                    } else {
+                      const error = await response.json();
+                      alert(error.error || 'Failed to save settings');
+                    }
+                  } catch (err) {
+                    alert('Failed to save settings');
+                  } finally {
+                    setLoadingSending(false);
+                  }
+                }}
+                disabled={loadingSending}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold"
+              >
+                {loadingSending ? 'Saving...' : 'Save Settings'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettingsModal(false);
+                  setEditingSettings(null);
+                }}
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
               >
                 Cancel
               </button>
