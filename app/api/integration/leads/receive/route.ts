@@ -374,6 +374,7 @@ export async function POST(request: NextRequest) {
           source: validated.source || null,
           tags: validated.tags && validated.tags.length > 0 ? validated.tags : null,
           report_url: validated.report_url || null,
+          analysis_image_url: validated.analysis_image_url || validated.landing_page_url || null, // Use analysis_image_url, fallback to landing_page_url for backward compatibility
           enrichment_data: Object.keys(enrichmentData).length > 0 ? enrichmentData : null,
           scheduled_send_at: scheduledSendAt.toISOString(),
           assigned_sdr_id: assignedSdrId || null,
