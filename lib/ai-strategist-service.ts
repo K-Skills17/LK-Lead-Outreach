@@ -293,7 +293,7 @@ export async function getCampaignAnalysisData(): Promise<CampaignAnalysisData> {
 
     // A/B test stats
     const activeTests = abTests?.filter((t: any) => t.status === 'active').length || 0;
-    const completedTests = abTests?.filter((t: any) => p.lead_tier === 'completed').length || 0;
+    const completedTests = abTests?.filter((t: any) => t.status === 'completed').length || 0;
     const testsWithResults = abTests?.filter((t: any) => t.status === 'completed').length || 0;
 
     return {
