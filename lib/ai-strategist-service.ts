@@ -84,16 +84,18 @@ Focus on:
 - Campaign organization (if many unassigned leads)
 - Lead quality improvements (if tier distribution is poor)
 
-Return ONLY a valid JSON array of suggestions in this format:
-[
-  {
-    "title": "Aprimorar a Personalização",
-    "impact": "HIGH",
-    "description": "Os dados mostram que a personalização é um fator crítico...",
-    "recommendedAction": "Desenvolver conteúdos de email personalizados...",
-    "category": "personalization"
-  }
-]`;
+Return ONLY a valid JSON object with a "suggestions" array in this format:
+{
+  "suggestions": [
+    {
+      "title": "Aprimorar a Personalização",
+      "impact": "HIGH",
+      "description": "Os dados mostram que a personalização é um fator crítico...",
+      "recommendedAction": "Desenvolver conteúdos de email personalizados...",
+      "category": "personalization"
+    }
+  ]
+}`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -108,7 +110,8 @@ Return ONLY a valid JSON array of suggestions in this format:
         },
       ],
       temperature: 0.7,
-      response_format: { type: 'json_object' },
+      // Note: Using text response and parsing JSON array manually
+      // as json_object mode expects a single object, not an array
     });
 
     const responseContent = completion.choices[0]?.message?.content;
