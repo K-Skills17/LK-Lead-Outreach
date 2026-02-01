@@ -15,6 +15,10 @@ import {
   Building2,
   Phone,
   Calendar,
+  Smartphone,
+  QrCode,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -80,6 +84,13 @@ export default function SDRDashboardPage() {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies'>('overview');
+  const [whatsappStatus, setWhatsappStatus] = useState<{
+    connected: boolean;
+    phone: string | null;
+    connectedAt: string | null;
+    lastSeen: string | null;
+  } | null>(null);
+  const [connectingWhatsapp, setConnectingWhatsapp] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -93,6 +104,7 @@ export default function SDRDashboardPage() {
 
     setUser(JSON.parse(userData));
     loadDashboardData(token);
+    loadWhatsappStatus(token);
   }, [router]);
 
   const loadDashboardData = async (token: string) => {
@@ -150,6 +162,102 @@ export default function SDRDashboardPage() {
     }
   };
 
+  const loadWhatsappStatus = async (token: string) => {
+    try {
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/whatsapp/status', {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWhatsappStatus({
+          connected: data.connected,
+          phone: data.phone,
+          connectedAt: data.connectedAt,
+          lastSeen: data.lastSeen,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading WhatsApp status:', error);
+    }
+  };
+
+  const handleConnectWhatsapp = async () => {
+    try {
+      setConnectingWhatsapp(true);
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/whatsapp/connect', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Connection initiated! Please open your desktop app and scan the QR code with your WhatsApp mobile app.\n\nSession ID: ${data.sessionId}`);
+        // Refresh status after a delay
+        setTimeout(() => {
+          loadWhatsappStatus(sdrId);
+        }, 2000);
+      } else {
+        const error = await response.json();
+        alert(`Failed to connect: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error connecting WhatsApp:', error);
+      alert('Failed to initiate WhatsApp connection');
+    } finally {
+      setConnectingWhatsapp(false);
+    }
+  };
+
+  const handleDisconnectWhatsapp = async () => {
+    if (!confirm('Are you sure you want to disconnect your WhatsApp?')) {
+      return;
+    }
+
+    try {
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/whatsapp/connect', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        await loadWhatsappStatus(sdrId);
+        alert('WhatsApp disconnected successfully');
+      } else {
+        const error = await response.json();
+        alert(`Failed to disconnect: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error disconnecting WhatsApp:', error);
+      alert('Failed to disconnect WhatsApp');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('sdr_token');
     localStorage.removeItem('sdr_user');
@@ -183,7 +291,7 @@ export default function SDRDashboardPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Welcome back, {user?.name}!
@@ -197,6 +305,74 @@ export default function SDRDashboardPage() {
               <LogOut className="w-4 h-4" />
               <span>Logout</span>
             </button>
+          </div>
+
+          {/* WhatsApp Connection Status */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {whatsappStatus?.connected ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Wifi className="w-5 h-5" />
+                    <div>
+                      <p className="font-semibold">WhatsApp Connected</p>
+                      {whatsappStatus.phone && (
+                        <p className="text-sm text-gray-600">{whatsappStatus.phone}</p>
+                      )}
+                      {whatsappStatus.connectedAt && (
+                        <p className="text-xs text-gray-500">
+                          Connected: {formatDate(whatsappStatus.connectedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <WifiOff className="w-5 h-5" />
+                    <div>
+                      <p className="font-semibold">WhatsApp Not Connected</p>
+                      <p className="text-sm text-gray-500">Connect your WhatsApp to send messages</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {whatsappStatus?.connected ? (
+                  <button
+                    onClick={handleDisconnectWhatsapp}
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-2"
+                  >
+                    <WifiOff className="w-4 h-4" />
+                    <span>Disconnect</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConnectWhatsapp}
+                    disabled={connectingWhatsapp}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {connectingWhatsapp ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="w-4 h-4" />
+                        <span>Connect WhatsApp</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+            {!whatsappStatus?.connected && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>How to connect:</strong> Click "Connect WhatsApp" above, then open your desktop app and scan the QR code with your WhatsApp mobile app.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
