@@ -119,7 +119,11 @@ export default function AdminDashboard() {
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AIStrategySuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'ai-strategist'>('overview');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailLead, setEmailLead] = useState<Lead | null>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailContent, setEmailContent] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
