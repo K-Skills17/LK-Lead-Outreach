@@ -58,6 +58,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check contact frequency (respect days since last contact)
+    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS } = await import('@/lib/human-behavior-service');
+    const contactCheck = await canContactLead(null, contact.email, DEFAULT_HUMAN_BEHAVIOR_SETTINGS.daysSinceLastContact);
+    
+    if (!contactCheck.canContact) {
+      return NextResponse.json(
+        { 
+          error: 'Contact frequency limit',
+          message: `This contact was reached ${contactCheck.daysSinceContact?.toFixed(1)} days ago. Minimum ${DEFAULT_HUMAN_BEHAVIOR_SETTINGS.daysSinceLastContact} days required.`,
+          lastContactedAt: contactCheck.lastContactedAt,
+          daysSinceContact: contactCheck.daysSinceContact,
+        },
+        { status: 429 } // Too Many Requests
+      );
+    }
+
+    // Check optimal send time (skip weekends, limit Mon/Fri)
+    const { calculateOptimalSendTime } = await import('@/lib/send-time-service');
+    const now = new Date();
+    const sendTimeResult = await calculateOptimalSendTime({
+      contactId: contact.id,
+      businessType: 'general',
+      leadPriority: 'MEDIUM',
+      timezone: 'America/Sao_Paulo',
+    });
+    
+    // If optimal time is in the future, schedule it (but allow immediate send if admin wants)
+    // For now, we'll allow immediate sends but log the optimal time
+    
     // Send email via Resend
     const fromEmail = validated.fromEmail || process.env.EMAIL_FROM || 'LK Lead Outreach <noreply@lkdigital.org>';
     const replyTo = validated.replyTo || process.env.EMAIL_REPLY_TO || 'contato@lkdigital.org';
@@ -130,11 +159,24 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    // Record contact in history
+    const { recordContact } = await import('@/lib/human-behavior-service');
+    await recordContact({
+      contactId: contact.id,
+      email: contact.email,
+      channel: 'email',
+      campaignId: contact.campaign_id || undefined,
+      sdrId: contact.assigned_sdr_id || undefined,
+      status: 'sent',
+    });
+
     return NextResponse.json({
       success: true,
       emailId: emailRecord?.id,
       resendEmailId: resendEmailId,
       message: 'Email sent successfully',
+      optimalSendTime: sendTimeResult.optimalSendAt,
+      note: sendTimeResult.reason,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

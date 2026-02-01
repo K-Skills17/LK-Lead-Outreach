@@ -48,44 +48,71 @@ const BUSINESS_OPTIMAL_TIMES: Record<BusinessType, number[]> = {
 
 /**
  * Get day of week score (0 = worst, 100 = best)
+ * Implements strict day-of-week logic:
+ * - Skip weekends completely (Saturday/Sunday = 0)
+ * - Limited messages on Monday and Friday (lower scores)
+ * - More outreach Tuesday-Thursday (highest scores)
  */
 function getDayOfWeekScore(day: number): number {
   // 0 = Sunday, 1 = Monday, 2 = Tuesday, ..., 6 = Saturday
   const scores: Record<number, number> = {
-    0: 20, // Sunday - avoid
-    1: 40, // Monday - avoid (too busy)
-    2: 100, // Tuesday - best
-    3: 95, // Wednesday - best
-    4: 90, // Thursday - best
-    5: 50, // Friday - ok
-    6: 10, // Saturday - avoid
+    0: 0, // Sunday - SKIP COMPLETELY
+    1: 30, // Monday - LIMITED (reduced from 40)
+    2: 100, // Tuesday - BEST (most outreach)
+    3: 100, // Wednesday - BEST (most outreach)
+    4: 100, // Thursday - BEST (most outreach)
+    5: 30, // Friday - LIMITED (reduced from 50)
+    6: 0, // Saturday - SKIP COMPLETELY
   };
   
-  return scores[day] || 50;
+  return scores[day] || 0;
+}
+
+/**
+ * Check if a day should be skipped completely
+ */
+export function shouldSkipDay(day: number): boolean {
+  // Skip weekends completely
+  return day === 0 || day === 6; // Sunday or Saturday
 }
 
 /**
  * Calculate optimal day of week
+ * Skips weekends completely and prioritizes Tuesday-Thursday
  */
 function calculateOptimalDay(currentDate: Date, leadPriority: LeadPriority): { date: Date; score: number } {
   const results: Array<{ date: Date; score: number }> = [];
   
-  // Check next 7 days
-  for (let i = 0; i < 7; i++) {
+  // Check next 14 days to ensure we find a valid weekday
+  for (let i = 0; i < 14; i++) {
     const checkDate = new Date(currentDate);
     checkDate.setDate(checkDate.getDate() + i);
     
     const dayOfWeek = checkDate.getDay();
+    
+    // Skip weekends completely
+    if (shouldSkipDay(dayOfWeek)) {
+      continue;
+    }
+    
     let score = getDayOfWeekScore(dayOfWeek);
     
     // VIP leads get earlier slots (prefer sooner dates)
     if (leadPriority === 'VIP') {
-      score += Math.max(0, 20 - i * 3);
+      score += Math.max(0, 20 - i * 2);
     } else if (leadPriority === 'HIGH') {
-      score += Math.max(0, 10 - i * 2);
+      score += Math.max(0, 10 - i * 1.5);
     }
     
     results.push({ date: checkDate, score });
+  }
+  
+  // If no valid days found (shouldn't happen), return next Tuesday
+  if (results.length === 0) {
+    const nextTuesday = new Date(currentDate);
+    const daysUntilTuesday = (2 - currentDate.getDay() + 7) % 7 || 7;
+    nextTuesday.setDate(nextTuesday.getDate() + daysUntilTuesday);
+    return { date: nextTuesday, score: 100 };
   }
   
   // Sort by score and return best day
@@ -185,15 +212,26 @@ function addRandomization(): number {
 
 /**
  * Calculate optimal send time
+ * NEVER schedules on weekends (Saturday/Sunday)
+ * Prioritizes Tuesday-Thursday, limits Monday/Friday
  */
 export async function calculateOptimalSendTime(input: SendTimeInput): Promise<SendTimeResult> {
   const now = new Date();
   const businessType = input.businessType || 'general';
   const leadPriority = input.leadPriority || 'MEDIUM';
   
-  // 1. Find optimal day
+  // 1. Find optimal day (automatically skips weekends)
   const { date: optimalDay, score: dayScore } = calculateOptimalDay(now, leadPriority);
   const dayOfWeek = optimalDay.getDay();
+  
+  // Double-check: never schedule on weekends
+  if (shouldSkipDay(dayOfWeek)) {
+    // If somehow we got a weekend, find next Tuesday
+    const nextTuesday = new Date(now);
+    const daysUntilTuesday = (2 - now.getDay() + 7) % 7 || 7;
+    nextTuesday.setDate(nextTuesday.getDate() + daysUntilTuesday);
+    optimalDay.setTime(nextTuesday.getTime());
+  }
   
   // 2. Find optimal hour
   const { hour, openRate, sampleSize, reason: hourReason } = await selectOptimalHour(

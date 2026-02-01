@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     };
 
     console.log(`[Integration] Processing ${leads.length} lead(s)`);
-    
+
     for (const leadData of leads) {
       try {
         console.log(`[Integration] Validating lead: ${leadData.nome || 'unknown'}`);
@@ -229,8 +229,8 @@ export async function POST(request: NextRequest) {
             location: string;
             keyword: string;
           } = {
-            clinic_id: clinicId,
-            name: campaignName,
+              clinic_id: clinicId,
+              name: campaignName,
             location: location, // REQUIRED - NOT NULL constraint
             keyword: keyword, // Always provide keyword (may also be NOT NULL)
           };
@@ -283,10 +283,38 @@ export async function POST(request: NextRequest) {
           console.log(`[Integration] Lead does not exist - will create new`);
         }
 
-        // Calculate scheduled send time for WhatsApp (respect delay)
+        // Calculate optimal send time using AI service (respects day-of-week, skips weekends)
+        const { calculateOptimalSendTime } = await import('@/lib/send-time-service');
+        
+        // Determine lead priority from personalization tier if available
+        let leadPriority: 'VIP' | 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
+        if (validated.personalization_data?.tier) {
+          const tier = validated.personalization_data.tier.toUpperCase();
+          if (tier === 'VIP') leadPriority = 'VIP';
+          else if (tier === 'HOT') leadPriority = 'HIGH';
+          else if (tier === 'WARM') leadPriority = 'MEDIUM';
+          else leadPriority = 'LOW';
+        }
+        
+        // Calculate optimal send time (respects delay + day-of-week logic)
         const delayHours = validated.whatsapp_followup_delay_hours || 24;
-        const scheduledSendAt = new Date();
-        scheduledSendAt.setHours(scheduledSendAt.getHours() + delayHours);
+        const baseTime = new Date();
+        baseTime.setHours(baseTime.getHours() + delayHours);
+        
+        const sendTimeResult = await calculateOptimalSendTime({
+          contactId: existingLead?.id || 'new',
+          businessType: validated.industry as any || 'general',
+          niche: validated.niche,
+          leadPriority,
+          timezone: 'America/Sao_Paulo',
+        });
+        
+        // Use optimal send time, but ensure it's at least delayHours from now
+        const optimalSendAt = new Date(sendTimeResult.optimalSendAt);
+        const minSendAt = new Date();
+        minSendAt.setHours(minSendAt.getHours() + delayHours);
+        
+        const scheduledSendAt = optimalSendAt > minSendAt ? optimalSendAt : minSendAt;
 
         // Prepare enrichment data as JSONB - store ALL data from lead gen tool
         const enrichmentData: Record<string, any> = {};

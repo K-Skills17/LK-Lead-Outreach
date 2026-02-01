@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get contact details for history recording
+    const { data: contact } = await supabaseAdmin
+      .from('campaign_contacts')
+      .select('id, phone, email, assigned_sdr_id, campaign_id')
+      .eq('id', validated.contactId)
+      .single();
+
     // Update contact status
     const { error } = await supabaseAdmin
       .from('campaign_contacts')
@@ -105,6 +112,20 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Record contact in history
+    if (contact) {
+      const { recordContact } = await import('@/lib/human-behavior-service');
+      await recordContact({
+        contactId: contact.id,
+        phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        channel: 'whatsapp',
+        campaignId: contact.campaign_id || undefined,
+        sdrId: contact.assigned_sdr_id || undefined,
+        status: 'sent',
+      });
     }
 
     return NextResponse.json({

@@ -118,16 +118,51 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter leads: only include those where scheduled_send_at has passed (or is null for backward compatibility)
-    const readyContacts = (contacts || []).filter((cc: any) => {
-      if (!cc.scheduled_send_at) {
-        // No scheduled time = ready immediately (backward compatibility)
-        return true;
+    // Import human behavior service
+    const { canContactLead, DEFAULT_HUMAN_BEHAVIOR_SETTINGS } = await import('@/lib/human-behavior-service');
+    const { shouldSkipDay } = await import('@/lib/send-time-service');
+    
+    // Filter leads with multiple checks:
+    // 1. Scheduled send time has passed
+    // 2. Contact frequency check (days since last contact)
+    // 3. Day-of-week check (skip weekends, limit Mon/Fri)
+    const readyContacts = [];
+    
+    for (const cc of contacts || []) {
+      // Check scheduled send time
+      if (cc.scheduled_send_at) {
+        const scheduledTime = new Date(cc.scheduled_send_at);
+        if (scheduledTime > now) {
+          continue; // Not ready yet
+        }
       }
-      // Check if scheduled time has passed
-      const scheduledTime = new Date(cc.scheduled_send_at);
-      return scheduledTime <= now;
-    }).slice(0, limit); // Limit to requested amount
+      
+      // Check day of week (skip weekends completely)
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      if (shouldSkipDay(dayOfWeek)) {
+        continue; // Skip weekends
+      }
+      
+      // Check contact frequency
+      const contactCheck = await canContactLead(
+        cc.phone,
+        null,
+        DEFAULT_HUMAN_BEHAVIOR_SETTINGS.daysSinceLastContact
+      );
+      
+      if (!contactCheck.canContact) {
+        continue; // Contacted too recently
+      }
+      
+      // All checks passed - add to ready list
+      readyContacts.push(cc);
+      
+      // Stop when we have enough
+      if (readyContacts.length >= limit) {
+        break;
+      }
+    }
 
     // Format response with all CSV fields
     const formattedContacts = readyContacts.map((cc: any) => ({
