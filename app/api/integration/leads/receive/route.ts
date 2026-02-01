@@ -206,12 +206,18 @@ export async function POST(request: NextRequest) {
             console.log(`[Integration] ✅ Created clinic ${clinicId}`);
           }
 
+          // Extract keyword from campaign name or use a default
+          // If campaign name contains a keyword (e.g., "Dentista RJ" -> "Dentista"), use it
+          // Otherwise, use the campaign name as keyword
+          const keyword = validated.niche || validated.campaign_name || campaignName.split(' ')[0] || 'general';
+
           const { data: newCampaign, error: campaignError } = await supabaseAdmin
             .from('campaigns')
             .insert({
               clinic_id: clinicId,
               name: campaignName,
               status: 'active',
+              keyword: keyword, // Add keyword field
             })
             .select('id')
             .single();
