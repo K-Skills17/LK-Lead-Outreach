@@ -57,8 +57,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       sessionId,
-      message: 'Connection initiated. Desktop app should now show QR code.',
-      instructions: 'Open your desktop app and scan the QR code with your WhatsApp mobile app.',
+      message: 'Connection initiated. WhatsApp Web will open in your browser.',
+      instructions: 'WhatsApp Web will open in a new window. Scan the QR code with your WhatsApp mobile app.',
+      whatsappWebUrl: 'https://web.whatsapp.com',
     });
   } catch (error) {
     console.error('[WhatsApp Connect] Error:', error);
