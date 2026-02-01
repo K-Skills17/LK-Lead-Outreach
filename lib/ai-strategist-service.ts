@@ -1,0 +1,329 @@
+/**
+ * AI Strategist Service
+ * Analyzes campaign data and provides actionable insights and suggestions
+ */
+
+import OpenAI from 'openai';
+import { supabaseAdmin } from './supabaseAdmin';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export interface AIStrategySuggestion {
+  title: string;
+  impact: 'HIGH' | 'MEDIUM' | 'LOW';
+  description: string;
+  recommendedAction: string;
+  category: 'personalization' | 'ab_testing' | 'send_time' | 'campaign_optimization' | 'lead_quality';
+}
+
+export interface CampaignAnalysisData {
+  totalLeads: number;
+  pendingLeads: number;
+  sentLeads: number;
+  vipLeads: number;
+  hotLeads: number;
+  warmLeads: number;
+  coldLeads: number;
+  avgPersonalizationScore: number;
+  totalCampaigns: number;
+  activeCampaigns: number;
+  unassignedLeads: number;
+  personalizationStats: {
+    withPersonalization: number;
+    withoutPersonalization: number;
+    avgScore: number;
+    tierDistribution: {
+      VIP: number;
+      HOT: number;
+      WARM: number;
+      COLD: number;
+    };
+  };
+  sendTimeStats: {
+    withOptimalTime: number;
+    withoutOptimalTime: number;
+    avgConfidence: number;
+  };
+  abTestStats: {
+    activeTests: number;
+    completedTests: number;
+    testsWithResults: number;
+  };
+}
+
+/**
+ * Analyze campaign data and generate AI-powered suggestions
+ */
+export async function generateAIStrategistSuggestions(
+  analysisData: CampaignAnalysisData
+): Promise<AIStrategySuggestion[]> {
+  try {
+    // Build analysis context for GPT-4
+    const analysisContext = buildAnalysisContext(analysisData);
+
+    // Generate suggestions using GPT-4
+    const prompt = `You are an AI strategist analyzing campaign performance data. Based on the following data, provide 3-5 actionable suggestions to improve campaign performance.
+
+Campaign Data:
+${analysisContext}
+
+For each suggestion, provide:
+1. Title (in Portuguese, max 50 characters)
+2. Impact level (HIGH, MEDIUM, or LOW)
+3. Description (in Portuguese, 1-2 sentences explaining what the data shows)
+4. Recommended Action (in Portuguese, 1-2 sentences with specific actionable steps)
+5. Category (one of: personalization, ab_testing, send_time, campaign_optimization, lead_quality)
+
+Focus on:
+- Personalization improvements (if personalization scores are low or missing)
+- A/B testing opportunities (if no tests are running)
+- Send time optimization (if send times aren't optimized)
+- Campaign organization (if many unassigned leads)
+- Lead quality improvements (if tier distribution is poor)
+
+Return ONLY a valid JSON array of suggestions in this format:
+[
+  {
+    "title": "Aprimorar a Personalização",
+    "impact": "HIGH",
+    "description": "Os dados mostram que a personalização é um fator crítico...",
+    "recommendedAction": "Desenvolver conteúdos de email personalizados...",
+    "category": "personalization"
+  }
+]`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert marketing strategist that analyzes campaign data and provides actionable, data-driven suggestions. Always respond with valid JSON only.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    });
+
+    const responseContent = completion.choices[0]?.message?.content;
+    if (!responseContent) {
+      return getFallbackSuggestions(analysisData);
+    }
+
+    // Parse JSON response
+    const parsed = JSON.parse(responseContent);
+    const suggestions = Array.isArray(parsed) ? parsed : parsed.suggestions || [];
+
+    // Validate and ensure we have suggestions
+    if (!Array.isArray(suggestions) || suggestions.length === 0) {
+      return getFallbackSuggestions(analysisData);
+    }
+
+    // Validate each suggestion has required fields
+    return suggestions
+      .filter((s: any) => s.title && s.impact && s.description && s.recommendedAction)
+      .slice(0, 5); // Max 5 suggestions
+  } catch (error) {
+    console.error('[AI Strategist] Error generating suggestions:', error);
+    return getFallbackSuggestions(analysisData);
+  }
+}
+
+/**
+ * Build analysis context string from data
+ */
+function buildAnalysisContext(data: CampaignAnalysisData): string {
+  const context = [
+    `Total Leads: ${data.totalLeads}`,
+    `Pending: ${data.pendingLeads}, Sent: ${data.sentLeads}`,
+    `Lead Tiers: VIP=${data.vipLeads}, HOT=${data.hotLeads}, WARM=${data.warmLeads}, COLD=${data.coldLeads}`,
+    `Average Personalization Score: ${data.avgPersonalizationScore}%`,
+    `Total Campaigns: ${data.totalCampaigns}, Active: ${data.activeCampaigns}`,
+    `Unassigned Leads: ${data.unassignedLeads}`,
+    `Personalization: ${data.personalizationStats.withPersonalization} with, ${data.personalizationStats.withoutPersonalization} without`,
+    `Tier Distribution: VIP=${data.personalizationStats.tierDistribution.VIP}, HOT=${data.personalizationStats.tierDistribution.HOT}, WARM=${data.personalizationStats.tierDistribution.WARM}, COLD=${data.personalizationStats.tierDistribution.COLD}`,
+    `Send Time Optimization: ${data.sendTimeStats.withOptimalTime} with optimal time, ${data.sendTimeStats.withoutOptimalTime} without`,
+    `A/B Tests: ${data.abTestStats.activeTests} active, ${data.abTestStats.completedTests} completed`,
+  ].join('\n');
+
+  return context;
+}
+
+/**
+ * Generate fallback suggestions based on data analysis (no AI)
+ */
+function getFallbackSuggestions(data: CampaignAnalysisData): AIStrategySuggestion[] {
+  const suggestions: AIStrategySuggestion[] = [];
+
+  // Personalization suggestion
+  if (data.personalizationStats.withoutPersonalization > 0 || data.avgPersonalizationScore < 70) {
+    suggestions.push({
+      title: 'Aprimorar a Personalização',
+      impact: data.avgPersonalizationScore < 50 ? 'HIGH' : 'MEDIUM',
+      description: data.avgPersonalizationScore < 50
+        ? 'A personalização está abaixo do ideal. Leads com personalização têm muito melhor desempenho.'
+        : `A personalização é um fator crítico, especialmente nos tiers 'WARM' e 'HOT', com scores de ${data.avgPersonalizationScore}%.`,
+      recommendedAction: 'Desenvolver conteúdos de email personalizados para esses tiers, focando nas necessidades e interesses específicos dos leads.',
+      category: 'personalization',
+    });
+  }
+
+  // A/B Testing suggestion
+  if (data.abTestStats.activeTests === 0 && data.abTestStats.completedTests === 0) {
+    suggestions.push({
+      title: 'Implementar Testes A/B',
+      impact: 'MEDIUM',
+      description: 'Não foram realizados testes A/B, o que limita a capacidade de otimizar a abordagem de email.',
+      recommendedAction: 'Criar e testar duas variantes de email para avaliar qual gera mais aberturas e cliques, focando em diferentes linhas de assunto ou chamadas à ação.',
+      category: 'ab_testing',
+    });
+  }
+
+  // Send Time suggestion
+  if (data.sendTimeStats.withoutOptimalTime > data.sendTimeStats.withOptimalTime) {
+    suggestions.push({
+      title: 'Definir Horários de Envio Eficazes',
+      impact: 'MEDIUM',
+      description: 'A ausência de dados sobre melhores horários de envio impede a maximização de aberturas.',
+      recommendedAction: 'Realizar uma análise para determinar os melhores horários de envio, possivelmente testando envios em diferentes dias e horários da semana.',
+      category: 'send_time',
+    });
+  }
+
+  // Unassigned leads suggestion
+  if (data.unassignedLeads > 0) {
+    suggestions.push({
+      title: 'Atribuir Leads Não Atribuídos',
+      impact: data.unassignedLeads > 10 ? 'HIGH' : 'MEDIUM',
+      description: `Existem ${data.unassignedLeads} leads não atribuídos que não estão sendo trabalhados.`,
+      recommendedAction: 'Atribuir leads não atribuídos a SDRs para garantir que todos os leads sejam contactados.',
+      category: 'campaign_optimization',
+    });
+  }
+
+  // Lead quality suggestion
+  if (data.coldLeads > data.vipLeads + data.hotLeads) {
+    suggestions.push({
+      title: 'Melhorar Qualidade dos Leads',
+      impact: 'MEDIUM',
+      description: `A maioria dos leads está no tier 'COLD' (${data.coldLeads}), indicando necessidade de melhorar a qualificação.`,
+      recommendedAction: 'Revisar critérios de qualificação e focar em leads com maior potencial de conversão.',
+      category: 'lead_quality',
+    });
+  }
+
+  return suggestions.slice(0, 5);
+}
+
+/**
+ * Fetch comprehensive analysis data for AI strategist
+ */
+export async function getCampaignAnalysisData(): Promise<CampaignAnalysisData> {
+  try {
+    // Get all leads
+    const { data: leads } = await supabaseAdmin
+      .from('campaign_contacts')
+      .select('*');
+
+    // Get campaigns
+    const { data: campaigns } = await supabaseAdmin
+      .from('campaigns')
+      .select('*');
+
+    // Get personalization data
+    const { data: personalizations } = await supabaseAdmin
+      .from('lead_personalization')
+      .select('*');
+
+    // Get send time data
+    const { data: sendTimes } = await supabaseAdmin
+      .from('optimal_send_times')
+      .select('*');
+
+    // Get A/B test data
+    const { data: abTests } = await supabaseAdmin
+      .from('ab_test_campaigns')
+      .select('*');
+
+    const totalLeads = leads?.length || 0;
+    const pendingLeads = leads?.filter((l: any) => l.status === 'pending').length || 0;
+    const sentLeads = leads?.filter((l: any) => l.status === 'sent').length || 0;
+    const unassignedLeads = leads?.filter((l: any) => !l.assigned_sdr_id).length || 0;
+
+    // Personalization stats
+    const personalizationMap = new Map();
+    personalizations?.forEach((p: any) => {
+      personalizationMap.set(p.contact_id, p);
+    });
+
+    const withPersonalization = personalizations?.length || 0;
+    const withoutPersonalization = totalLeads - withPersonalization;
+    const avgScore = personalizations?.length
+      ? Math.round(
+          personalizations.reduce((sum: number, p: any) => sum + (p.personalization_score || 0), 0) /
+            personalizations.length
+        )
+      : 0;
+
+    const tierDistribution = {
+      VIP: personalizations?.filter((p: any) => p.lead_tier === 'VIP').length || 0,
+      HOT: personalizations?.filter((p: any) => p.lead_tier === 'HOT').length || 0,
+      WARM: personalizations?.filter((p: any) => p.lead_tier === 'WARM').length || 0,
+      COLD: personalizations?.filter((p: any) => p.lead_tier === 'COLD').length || 0,
+    };
+
+    // Send time stats
+    const withOptimalTime = sendTimes?.length || 0;
+    const withoutOptimalTime = totalLeads - withOptimalTime;
+    const avgConfidence = sendTimes?.length
+      ? Math.round(
+          sendTimes.reduce((sum: number, st: any) => sum + (st.confidence_score || 0), 0) /
+            sendTimes.length
+        )
+      : 0;
+
+    // A/B test stats
+    const activeTests = abTests?.filter((t: any) => t.status === 'active').length || 0;
+    const completedTests = abTests?.filter((t: any) => p.lead_tier === 'completed').length || 0;
+    const testsWithResults = abTests?.filter((t: any) => t.status === 'completed').length || 0;
+
+    return {
+      totalLeads,
+      pendingLeads,
+      sentLeads,
+      vipLeads: tierDistribution.VIP,
+      hotLeads: tierDistribution.HOT,
+      warmLeads: tierDistribution.WARM,
+      coldLeads: tierDistribution.COLD,
+      avgPersonalizationScore: avgScore,
+      totalCampaigns: campaigns?.length || 0,
+      activeCampaigns: campaigns?.filter((c: any) => c.status === 'active').length || 0,
+      unassignedLeads,
+      personalizationStats: {
+        withPersonalization,
+        withoutPersonalization,
+        avgScore,
+        tierDistribution,
+      },
+      sendTimeStats: {
+        withOptimalTime,
+        withoutOptimalTime,
+        avgConfidence,
+      },
+      abTestStats: {
+        activeTests,
+        completedTests,
+        testsWithResults,
+      },
+    };
+  } catch (error) {
+    console.error('[AI Strategist] Error fetching analysis data:', error);
+    throw error;
+  }
+}

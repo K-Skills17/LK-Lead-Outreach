@@ -77,6 +77,14 @@ interface Campaign {
   created_at: string;
 }
 
+interface AIStrategySuggestion {
+  title: string;
+  impact: 'HIGH' | 'MEDIUM' | 'LOW';
+  description: string;
+  recommendedAction: string;
+  category: 'personalization' | 'ab_testing' | 'send_time' | 'campaign_optimization' | 'lead_quality';
+}
+
 interface OverviewData {
   sdrs: SDR[];
   campaigns: Campaign[];
@@ -109,6 +117,8 @@ export default function AdminDashboard() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<AIStrategySuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -137,11 +147,34 @@ export default function AdminDashboard() {
 
       const overviewData = await response.json();
       setData(overviewData);
+      
+      // Load AI suggestions
+      loadAISuggestions(token);
     } catch (err) {
       console.error('Error loading overview:', err);
       setError('Failed to load data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAISuggestions = async (token: string) => {
+    try {
+      setLoadingSuggestions(true);
+      const response = await fetch('/api/admin/ai-strategist', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setAiSuggestions(result.suggestions || []);
+      }
+    } catch (err) {
+      console.error('Error loading AI suggestions:', err);
+    } finally {
+      setLoadingSuggestions(false);
     }
   };
 
@@ -452,6 +485,75 @@ export default function AdminDashboard() {
               </div>
               <p className="text-sm font-medium text-white/90">Avg Personalization</p>
               <p className="text-xs text-white/70 mt-1">AI analysis quality score</p>
+            </div>
+          </div>
+        )}
+
+        {/* AI Strategist Suggestions */}
+        {aiSuggestions.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-br from-slate-800 via-purple-900 to-slate-800 rounded-2xl shadow-2xl p-6 border border-purple-500/20 relative overflow-hidden">
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32" />
+              
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <Sparkles className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">AI Strategist Suggestions</h2>
+                    <p className="text-sm text-purple-200">Real-time campaign optimization insights</p>
+                  </div>
+                </div>
+                {loadingSuggestions && (
+                  <Loader2 className="w-5 h-5 animate-spin text-purple-300" />
+                )}
+              </div>
+
+              {/* Suggestions Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+                {aiSuggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 hover:bg-white/15 transition-all duration-300"
+                  >
+                    {/* Title and Impact Badge */}
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-lg font-bold text-white flex-1 pr-2">
+                        {suggestion.title}
+                      </h3>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                          suggestion.impact === 'HIGH'
+                            ? 'bg-orange-500/80 text-white'
+                            : suggestion.impact === 'MEDIUM'
+                            ? 'bg-blue-500/80 text-white'
+                            : 'bg-gray-500/80 text-white'
+                        }`}
+                      >
+                        {suggestion.impact} IMPACT
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <div className="bg-white/5 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-purple-100 leading-relaxed">
+                        {suggestion.description}
+                      </p>
+                    </div>
+
+                    {/* Recommended Action */}
+                    <div>
+                      <p className="text-xs font-semibold text-purple-300 mb-2">RECOMMENDED ACTION</p>
+                      <p className="text-sm text-white leading-relaxed">
+                        {suggestion.recommendedAction}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
