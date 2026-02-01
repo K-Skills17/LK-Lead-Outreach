@@ -602,11 +602,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Tab Content */}
-        {selectedTab === 'overview' && (
-          <>
-            {/* Modern Tabs */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
+        {/* Modern Tabs */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
           <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-blue-50/30">
             <div className="flex space-x-2 px-6">
               {(['overview', 'sdrs', 'leads', 'campaigns'] as const).map((tab) => (
