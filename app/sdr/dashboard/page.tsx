@@ -214,7 +214,21 @@ export default function SDRDashboardPage() {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Connection initiated! Please open your desktop app and scan the QR code with your WhatsApp mobile app.\n\nSession ID: ${data.sessionId}`);
+        
+        // Open WhatsApp Web in a new window
+        const whatsappWindow = window.open(
+          'https://web.whatsapp.com',
+          'whatsapp-web',
+          'width=1200,height=800,scrollbars=yes,resizable=yes'
+        );
+        
+        if (whatsappWindow) {
+          // Show instructions
+          alert(`WhatsApp Web is opening in a new window.\n\n1. Scan the QR code with your WhatsApp mobile app\n2. Keep the WhatsApp Web window open for sending messages\n3. Click "I've Connected" below once you've scanned the code`);
+        } else {
+          alert('Please allow pop-ups for this site, then try again.');
+        }
+        
         // Refresh status after a delay
         setTimeout(() => {
           loadWhatsappStatus(sdrId);
@@ -228,6 +242,42 @@ export default function SDRDashboardPage() {
       alert('Failed to initiate WhatsApp connection');
     } finally {
       setConnectingWhatsapp(false);
+    }
+  };
+
+  const handleConfirmConnection = async () => {
+    try {
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      // Get phone number from user (optional, can be detected later)
+      const phone = prompt('Enter your WhatsApp phone number (optional, e.g., +5511999999999):');
+      
+      const response = await fetch('/api/sdr/whatsapp/connect', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          connected: true,
+          phone: phone || null,
+        }),
+      });
+
+      if (response.ok) {
+        alert('WhatsApp connection confirmed! You can now send messages manually through WhatsApp Web.');
+        loadWhatsappStatus(sdrId);
+      } else {
+        const error = await response.json();
+        alert(`Failed to confirm connection: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error confirming connection:', error);
+      alert('Failed to confirm WhatsApp connection');
     }
   };
 
@@ -398,9 +448,22 @@ export default function SDRDashboardPage() {
               </div>
             </div>
             {!whatsappStatus?.connected && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
                 <p className="text-sm text-blue-800">
-                  <strong>How to connect:</strong> Click "Connect WhatsApp" above, then open your desktop app and scan the QR code with your WhatsApp mobile app.
+                  <strong>How to connect:</strong> Click "Connect WhatsApp" above to open WhatsApp Web in a new window. Scan the QR code with your WhatsApp mobile app, then click "I've Connected" below.
+                </p>
+                <button
+                  onClick={handleConfirmConnection}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  I've Connected ✓
+                </button>
+              </div>
+            )}
+            {whatsappStatus?.connected && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>✓ Connected!</strong> Keep WhatsApp Web open in your browser to send messages manually. You can see your assigned leads in the queue below.
                 </p>
               </div>
             )}

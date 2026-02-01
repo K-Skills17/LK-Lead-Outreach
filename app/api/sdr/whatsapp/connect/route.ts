@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       success: true,
       sessionId,
       message: 'Connection initiated. WhatsApp Web will open in your browser.',
-      instructions: 'WhatsApp Web will open in a new window. Scan the QR code with your WhatsApp mobile app.',
+      instructions: 'WhatsApp Web will open in a new window. Scan the QR code with your WhatsApp mobile app, then confirm the connection in the dashboard.',
       whatsappWebUrl: 'https://web.whatsapp.com',
     });
   } catch (error) {
