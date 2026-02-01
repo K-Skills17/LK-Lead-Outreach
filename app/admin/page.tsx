@@ -113,7 +113,7 @@ export default function AdminDashboard() {
   const [authToken, setAuthToken] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns'>('overview');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns' | 'emails'>('overview');
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [assignSdrId, setAssignSdrId] = useState('');
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -639,7 +639,7 @@ export default function AdminDashboard() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
           <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-blue-50/30">
             <div className="flex space-x-2 px-6">
-              {(['overview', 'sdrs', 'leads', 'campaigns'] as const).map((tab) => (
+              {(['overview', 'sdrs', 'leads', 'campaigns', 'emails'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setSelectedTab(tab)}
