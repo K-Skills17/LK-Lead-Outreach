@@ -56,6 +56,9 @@ export async function GET(request: NextRequest) {
 
     if (leadsError) {
       console.error('[Admin Overview] Error fetching leads:', leadsError);
+      console.error('[Admin Overview] Error details:', JSON.stringify(leadsError, null, 2));
+    } else {
+      console.log(`[Admin Overview] Successfully fetched ${leads?.length || 0} leads`);
     }
 
     // Calculate stats for each SDR

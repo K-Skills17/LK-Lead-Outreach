@@ -1,1 +1,29 @@
-FB_CAPI_ACCESS_TOKEN=
+# ============================================
+# REQUIRED - Database
+# ============================================
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# ============================================
+# REQUIRED - Lead Gen Integration
+# ============================================
+LEAD_GEN_INTEGRATION_TOKEN=your_secure_token_32_chars_min
+
+# ============================================
+# REQUIRED - Admin Dashboard
+# ============================================
+ADMIN_DASHBOARD_TOKEN=your_secure_admin_token
+
+# ============================================
+# REQUIRED - SDR & Desktop App
+# ============================================
+SENDER_SERVICE_TOKEN=your_secure_sender_token_32_chars_min
+
+# ============================================
+# OPTIONAL - But Recommended
+# ============================================
+OPENAI_API_KEY=sk-proj-your_key_here
+RESEND_API_KEY=re_your_key_here
+EMAIL_FROM=LK Lead Outreach <noreply@lkdigital.org>
+NEXT_PUBLIC_APP_URL=https://your-domain.com

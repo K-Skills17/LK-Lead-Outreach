@@ -152,10 +152,14 @@ export default function AdminDashboard() {
   };
 
   const handleAssignLeads = async () => {
-    if (selectedLeads.size === 0 || !assignSdrId) return;
+    if (selectedLeads.size === 0 || !assignSdrId) {
+      setError('Please select at least one lead and an SDR');
+      return;
+    }
 
     try {
       setIsLoading(true);
+      setError('');
       const response = await fetch('/api/admin/assign-lead', {
         method: 'PUT',
         headers: {
@@ -169,16 +173,23 @@ export default function AdminDashboard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to assign leads');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to assign leads');
       }
 
+      const result = await response.json();
+      
       // Reload data
       await loadOverview(authToken);
       setSelectedLeads(new Set());
       setShowAssignModal(false);
       setAssignSdrId('');
+      
+      // Show success message
+      alert(`✅ ${result.message || 'Leads assigned successfully!'}`);
     } catch (err) {
-      setError('Failed to assign leads');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to assign leads';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -429,14 +440,20 @@ export default function AdminDashboard() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
-                  {selectedLeads.size > 0 && (
-                    <button
-                      onClick={() => setShowAssignModal(true)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {selectedLeads.size > 0 && (
+                      <button
+                        onClick={() => setShowAssignModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+                      </button>
+                    )}
+                    {data.leads.length === 0 && (
+                      <p className="text-sm text-gray-500">No leads available. Send leads from your Lead Gen Tool.</p>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -462,6 +479,7 @@ export default function AdminDashboard() {
                         <th className="text-left py-2 px-4 font-medium text-gray-700">Assigned To</th>
                         <th className="text-left py-2 px-4 font-medium text-gray-700">Campaign</th>
                         <th className="text-left py-2 px-4 font-medium text-gray-700">Date</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -508,6 +526,19 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-4 text-xs text-gray-600">
                               {formatDate(lead.created_at)}
+                            </td>
+                            <td className="py-2 px-4">
+                              <button
+                                onClick={() => {
+                                  setSelectedLeads(new Set([lead.id]));
+                                  setShowAssignModal(true);
+                                }}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
+                                title="Assign to SDR"
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                Assign
+                              </button>
                             </td>
                           </tr>
                         );
@@ -584,23 +615,39 @@ export default function AdminDashboard() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select SDR
-              </label>
-              <select
-                value={assignSdrId}
-                onChange={(e) => setAssignSdrId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Choose an SDR...</option>
-                {data.sdrs.map((sdr) => (
-                  <option key={sdr.id} value={sdr.id}>
-                    {sdr.name} ({sdr.email})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {data.sdrs.length === 0 ? (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ No SDRs available. Create an SDR account first.
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Use the create-sdr.ps1 script or see CREATE_SDR_ACCOUNT_GUIDE.md
+                </p>
+              </div>
+            ) : (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select SDR
+                </label>
+                <select
+                  value={assignSdrId}
+                  onChange={(e) => setAssignSdrId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Choose an SDR...</option>
+                  {data.sdrs.map((sdr) => (
+                    <option key={sdr.id} value={sdr.id}>
+                      {sdr.name} ({sdr.email}) - {sdr.stats.totalLeads} leads
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={handleAssignLeads}

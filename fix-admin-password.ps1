@@ -35,16 +35,20 @@ Write-Host "✅ Hash generated" -ForegroundColor Green
 Write-Host "`n📝 Run this SQL in Supabase:" -ForegroundColor Cyan
 Write-Host "=" * 50 -ForegroundColor Gray
 
+# Escape single quotes in hash and email for SQL
+$escapedHash = $hash -replace "'", "''"
+$escapedEmail = $Email -replace "'", "''"
+
 $sql = @"
 -- Update admin password with correct hash
 UPDATE admin_users 
-SET password_hash = '$hash'
-WHERE email = '$Email';
+SET password_hash = '$escapedHash'
+WHERE email = '$escapedEmail';
 
 -- Verify the update
 SELECT email, name, LEFT(password_hash, 10) as hash_preview
 FROM admin_users
-WHERE email = '$Email';
+WHERE email = '$escapedEmail';
 "@
 
 Write-Host $sql -ForegroundColor White

@@ -157,9 +157,10 @@ export async function POST(request: NextRequest) {
 
         if (existingCampaign) {
           campaignId = existingCampaign.id;
+          console.log(`[Integration] Using existing campaign ${campaignId}: ${campaignName}`);
         } else {
           // Create default clinic if needed
-          const { data: defaultClinic } = await supabaseAdmin
+          const { data: defaultClinic, error: clinicError } = await supabaseAdmin
             .from('clinics')
             .select('id')
             .limit(1)
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
           let clinicId = defaultClinic?.id;
 
           if (!clinicId) {
-            const { data: newClinic } = await supabaseAdmin
+            const { data: newClinic, error: newClinicError } = await supabaseAdmin
               .from('clinics')
               .insert({
                 email: 'integration@lkdigital.org',
@@ -178,10 +179,22 @@ export async function POST(request: NextRequest) {
               .select('id')
               .single();
 
+            if (newClinicError) {
+              console.error('[Integration] ❌ Error creating clinic:', newClinicError);
+              results.errors.push(`Failed to create clinic: ${newClinicError.message}`);
+              continue;
+            }
+
             clinicId = newClinic?.id;
+            if (!clinicId) {
+              console.error('[Integration] ❌ Failed to get clinic ID after creation');
+              results.errors.push(`Failed to create clinic for ${validated.nome}`);
+              continue;
+            }
+            console.log(`[Integration] ✅ Created clinic ${clinicId}`);
           }
 
-          const { data: newCampaign } = await supabaseAdmin
+          const { data: newCampaign, error: campaignError } = await supabaseAdmin
             .from('campaigns')
             .insert({
               clinic_id: clinicId,
@@ -191,7 +204,20 @@ export async function POST(request: NextRequest) {
             .select('id')
             .single();
 
+          if (campaignError) {
+            console.error('[Integration] ❌ Error creating campaign:', campaignError);
+            console.error('[Integration] Campaign data:', { clinic_id: clinicId, name: campaignName });
+            results.errors.push(`Failed to create campaign ${campaignName}: ${campaignError.message}`);
+            continue;
+          }
+
           campaignId = newCampaign?.id;
+          if (!campaignId) {
+            console.error('[Integration] ❌ Failed to get campaign ID after creation');
+            results.errors.push(`Failed to create campaign for ${validated.nome}`);
+            continue;
+          }
+          console.log(`[Integration] ✅ Created campaign ${campaignId}: ${campaignName}`);
         }
 
         // Check if lead already exists in this campaign
@@ -311,15 +337,112 @@ export async function POST(request: NextRequest) {
           results.updated++;
         } else {
           // Create new lead
-          const { data: created } = await supabaseAdmin
+          const { data: created, error: insertError } = await supabaseAdmin
             .from('campaign_contacts')
             .insert(leadToUpsert)
             .select('id')
             .single();
 
+          if (insertError) {
+            console.error('[Integration] ❌ Error inserting lead:', insertError);
+            console.error('[Integration] Lead data:', JSON.stringify(leadToUpsert, null, 2));
+            console.error('[Integration] Campaign ID:', campaignId);
+            results.errors.push(`Failed to create lead for ${validated.nome}: ${insertError.message}`);
+            continue;
+          }
+
           leadId = created?.id;
+          
+          if (!leadId) {
+            console.error('[Integration] ❌ Failed to get lead ID after creation');
+            console.error('[Integration] Insert response:', { created, insertError });
+            results.errors.push(`Failed to create lead for ${validated.nome} - no ID returned`);
+            continue;
+          }
+          
           results.created++;
+          console.log(`[Integration] ✅ Created lead ${leadId} for ${validated.nome} in campaign ${campaignId}`);
         }
+
+        // ===== NEW FEATURES INTEGRATION =====
+        
+        // 1. Generate Personalization (async, non-blocking)
+        if (leadId) {
+          try {
+            const { generatePersonalization, savePersonalization } = await import('@/lib/personalization-service');
+            
+            // Prepare personalization input from lead data
+            const personalizationInput: any = {
+              name: validated.nome,
+              empresa: validated.empresa,
+              industry: validated.industry,
+              google_maps_ranking: validated.enrichment_data?.google_maps_ranking,
+              rating: validated.enrichment_data?.rating,
+              competitors: validated.enrichment_data?.competitors,
+              website_performance: validated.enrichment_data?.website_performance,
+              marketing_tags: validated.marketing_tags,
+              pain_points: validated.pain_points,
+              quality_score: validated.quality_score,
+              fit_score: validated.fit_score,
+              enrichment_score: validated.enrichment_score,
+              niche: validated.niche,
+              campaign_name: validated.campaign_name,
+            };
+            
+            const personalization = await generatePersonalization(personalizationInput);
+            await savePersonalization(leadId, personalization);
+            
+            console.log(`[Integration] Personalization generated for lead ${leadId}: ${personalization.personalizationScore}% score`);
+          } catch (personalizationError) {
+            console.error('[Integration] Personalization error:', personalizationError);
+            // Continue even if personalization fails
+          }
+        }
+        
+        // 2. Calculate Optimal Send Time (async, non-blocking)
+        if (leadId) {
+          try {
+            const { calculateOptimalSendTime, saveOptimalSendTime } = await import('@/lib/send-time-service');
+            
+            // Prepare send time input
+            const sendTimeInput: any = {
+              contactId: leadId,
+              businessType: validated.industry?.toLowerCase().includes('health') ? 'healthcare' : 'general',
+              niche: validated.niche,
+              leadPriority: validated.quality_score && validated.quality_score >= 85 ? 'VIP' 
+                          : validated.quality_score && validated.quality_score >= 70 ? 'HIGH'
+                          : 'MEDIUM',
+            };
+            
+            const sendTime = await calculateOptimalSendTime(sendTimeInput);
+            await saveOptimalSendTime(sendTimeInput, sendTime);
+            
+            console.log(`[Integration] Optimal send time calculated for lead ${leadId}: ${sendTime.optimalSendAt}`);
+          } catch (sendTimeError) {
+            console.error('[Integration] Send time error:', sendTimeError);
+            // Continue even if send time calculation fails
+          }
+        }
+        
+        // 3. Check for Active A/B Test (if campaign has one)
+        if (leadId && campaignId) {
+          try {
+            const { getActiveTestForCampaign, assignVariant } = await import('@/lib/ab-testing-service');
+            
+            const activeTest = await getActiveTestForCampaign(campaignId);
+            if (activeTest) {
+              const assignment = await assignVariant(activeTest.testId, leadId);
+              if (assignment.success) {
+                console.log(`[Integration] Lead ${leadId} assigned to A/B test variant: ${assignment.variantName}`);
+              }
+            }
+          } catch (abTestError) {
+            console.error('[Integration] A/B test error:', abTestError);
+            // Continue even if A/B test assignment fails
+          }
+        }
+        
+        // ===== END NEW FEATURES INTEGRATION =====
 
         // Send email if requested
         if (validated.send_email_first && validated.email) {
