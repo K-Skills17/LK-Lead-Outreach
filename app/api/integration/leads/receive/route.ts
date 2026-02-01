@@ -282,52 +282,6 @@ export async function POST(request: NextRequest) {
           console.log(`[Integration] Lead does not exist - will create new`);
         }
 
-        // ============================================
-        // LEAD QUALITY SCORING (from Stitch with Google)
-        // ============================================
-        const niche = validated.niche || validated.campaign_name || 'local business';
-        const enrichment: any = {
-          emails: validated.all_emails || (validated.email ? [validated.email] : []),
-          whatsapp_phone: validated.whatsapp,
-          contact_name: validated.contact_names?.[0],
-          has_contact_page: validated.has_contact_page,
-          has_booking_system: validated.has_booking_system,
-        };
-
-        const leadQualityInput = {
-          verified: validated.verified,
-          rating: validated.rating,
-          reviews: validated.reviews,
-          website: validated.site,
-          has_https: validated.has_https,
-          has_contact_page: validated.has_contact_page,
-          has_booking_system: validated.has_booking_system,
-          rank: validated.rank,
-          competitors: validated.competitors,
-          analysis: validated.website_analysis,
-          domain_age_days: validated.domain_age_days,
-        };
-
-        // Score the lead
-        const qualityResult = scoreBusinessQuality(leadQualityInput, niche);
-        
-        // Determine if should contact
-        const contactDecision = shouldContactLead(
-          leadQualityInput,
-          enrichment,
-          validated.website_analysis,
-          niche
-        );
-
-        console.log(`[Integration] Lead Quality Score: ${qualityResult.score} (${qualityResult.tier})`);
-        console.log(`[Integration] Should Contact: ${contactDecision.shouldContact}`);
-        if (!contactDecision.shouldContact) {
-          console.log(`[Integration] ⚠️ Skipping lead: ${contactDecision.reason}`);
-          results.errors.push(`Lead skipped: ${contactDecision.reason}`);
-          results.skipped = (results.skipped || 0) + 1;
-          continue;
-        }
-
         // Calculate scheduled send time for WhatsApp (respect delay)
         const delayHours = validated.whatsapp_followup_delay_hours || 24;
         const scheduledSendAt = new Date();
@@ -335,29 +289,6 @@ export async function POST(request: NextRequest) {
 
         // Prepare enrichment data as JSONB - store ALL data from lead gen tool
         const enrichmentData: Record<string, any> = {};
-        
-        // Quality scoring data (from lead gen tool)
-        enrichmentData.quality_score = qualityResult.score;
-        enrichmentData.quality_tier = qualityResult.tier;
-        enrichmentData.quality_signals = qualityResult.signals;
-        enrichmentData.quality_recommendation = qualityResult.recommendation;
-        enrichmentData.is_icp = contactDecision.isICP || false;
-        enrichmentData.email_quality = contactDecision.emailQuality || 0;
-        enrichmentData.business_score = contactDecision.businessScore || 0;
-        enrichmentData.contact_reasons = contactDecision.reasons || [];
-        enrichmentData.contact_warnings = contactDecision.warnings || [];
-        
-        // Google/Website analysis data
-        if (validated.verified !== undefined) enrichmentData.verified = validated.verified;
-        if (validated.rating !== undefined) enrichmentData.rating = validated.rating;
-        if (validated.reviews !== undefined) enrichmentData.reviews = validated.reviews;
-        if (validated.rank !== undefined) enrichmentData.rank = validated.rank;
-        if (validated.domain_age_days !== undefined) enrichmentData.domain_age_days = validated.domain_age_days;
-        if (validated.has_https !== undefined) enrichmentData.has_https = validated.has_https;
-        if (validated.has_contact_page !== undefined) enrichmentData.has_contact_page = validated.has_contact_page;
-        if (validated.has_booking_system !== undefined) enrichmentData.has_booking_system = validated.has_booking_system;
-        if (validated.website_analysis) enrichmentData.website_analysis = validated.website_analysis;
-        if (validated.competitors) enrichmentData.competitors = validated.competitors;
         
         // Business info
         if (validated.address) enrichmentData.address = validated.address;
@@ -429,7 +360,7 @@ export async function POST(request: NextRequest) {
           site: validated.site || null,
           dor_especifica: validated.dor_especifica || null,
           phone: normalizedPhone,
-          email: contactDecision.primaryEmail || validated.email || null, // Use quality-scored primary email
+          email: validated.email || null,
           status: 'pending' as const,
           personalized_message: validated.business_analysis || null,
           // Store all enrichment fields
