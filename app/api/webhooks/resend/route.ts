@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const { data: emailRecord } = await supabaseAdmin
       .from('email_sends')
-      .select('id')
+      .select('id, open_count, click_count, first_opened_at, last_opened_at, first_clicked_at, last_clicked_at, clicked_urls')
       .eq('resend_email_id', resendEmailId)
       .single();
 
