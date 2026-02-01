@@ -50,37 +50,43 @@ These fields are **mandatory** - leads will be rejected without them:
 
 ---
 
-## 🌍 3. Location Fields (HIGHLY RECOMMENDED)
+## 🌍 3. Location Fields (CRITICAL - REQUIRED)
 
-**Why:** These are used to create campaigns. If missing, campaigns may fail.
+**Why:** These are **REQUIRED** to create campaigns. Campaigns will fail without location data.
+
+**⚠️ IMPORTANT:** The database requires a `location` field. If you don't send it, we'll extract it from other fields, but it's best to send it directly.
 
 **Priority Order (send at least one):**
 ```json
 {
-  "location": "São Paulo, Brasil",    // ✅ BEST - Full location string
-  "city": "São Paulo",                // ✅ GOOD - City name
-  "state": "SP",                      // ✅ GOOD - State/Province
-  "country": "Brasil"                 // ✅ GOOD - Country name
+  "location": "São Paulo, Brasil",    // ✅ BEST - Full location string (used directly)
+  "city": "São Paulo",                // ✅ GOOD - We'll use this if location is missing
+  "state": "SP",                      // ✅ GOOD - We'll combine with city
+  "country": "Brasil"                 // ✅ GOOD - We'll use as fallback
 }
 ```
 
-**✅ Recommendation:** Always send `location` or `city` + `state` + `country`
+**✅ CRITICAL:** Always send at least one location field (`location`, `city`, `state`, or `country`)
+**❌ If all are missing:** Campaign creation will fail with "null value in column 'location'"
 
 ---
 
-## 🏷️ 4. Campaign Context Fields (RECOMMENDED)
+## 🏷️ 4. Campaign Context Fields (CRITICAL - REQUIRED)
 
-**Why:** These help organize leads into campaigns automatically.
+**Why:** These are **REQUIRED** for campaign creation. The `keyword` field is mandatory in the database.
+
+**⚠️ IMPORTANT:** The database requires a `keyword` field. We extract it from `niche` or `campaign_name`, but it's best to send `niche` directly.
 
 ```json
 {
-  "niche": "Dentista",                // ✅ RECOMMENDED - Used for campaign keyword
-  "campaign_name": "Q1 2025 Outreach", // ✅ RECOMMENDED - Campaign name
-  "location": "São Paulo, Brasil"     // ✅ RECOMMENDED - Campaign location
+  "niche": "Dentista",                // ✅ CRITICAL - Used for campaign keyword (REQUIRED)
+  "campaign_name": "Q1 2025 Outreach", // ✅ RECOMMENDED - Campaign name (fallback for keyword)
+  "location": "São Paulo, Brasil"     // ✅ CRITICAL - Campaign location (REQUIRED - see section 3)
 }
 ```
 
-**✅ Recommendation:** Always send `niche` and `location` for proper campaign organization
+**✅ CRITICAL:** Always send `niche` or `campaign_name` to avoid "null value in column 'keyword'" errors
+**✅ CRITICAL:** Always send `location` (see section 3 above)
 
 ---
 
@@ -246,13 +252,13 @@ function validateLead(lead) {
     errors.push('phone must be in E.164 format (e.g., +5511999999999)');
   }
   
-  // Recommended fields
-  if (!lead.location && !lead.city && !lead.country) {
-    console.warn('⚠️ No location data - campaign creation may use defaults');
+  // Critical fields (will cause errors if missing)
+  if (!lead.location && !lead.city && !lead.state && !lead.country) {
+    errors.push('At least one location field is REQUIRED (location, city, state, or country)');
   }
   
   if (!lead.niche && !lead.campaign_name) {
-    console.warn('⚠️ No niche/campaign_name - campaign keyword may be generic');
+    errors.push('niche or campaign_name is REQUIRED (for campaign keyword)');
   }
   
   return {
@@ -308,15 +314,19 @@ function validateLead(lead) {
 
 Before sending each lead, verify:
 
+**🔴 CRITICAL (Will cause errors if missing):**
 - [ ] `nome` is present and non-empty
 - [ ] `empresa` is present and non-empty
 - [ ] `phone` is in E.164 format (starts with `+`)
-- [ ] At least one location field (`location`, `city`, `state`, or `country`)
-- [ ] `niche` or `campaign_name` is provided (recommended)
+- [ ] At least one location field (`location`, `city`, `state`, or `country`) - **REQUIRED**
+- [ ] `niche` or `campaign_name` is provided - **REQUIRED** (for campaign keyword)
+
+**🟡 IMPORTANT (Recommended for best results):**
 - [ ] Integration token is set correctly
 - [ ] API endpoint URL is correct
 - [ ] Error handling is implemented
 - [ ] Retry logic is configured
+- [ ] Data validation is performed before sending
 
 ---
 
@@ -405,17 +415,18 @@ async function sendLeadToOutreach(leadData) {
 
 ## 🎯 14. Critical Success Factors
 
-**✅ Must Have:**
+**🔴 MUST HAVE (Will fail without these):**
 1. ✅ Correct authentication token
 2. ✅ Required fields: `nome`, `empresa`, `phone`
 3. ✅ Phone in E.164 format
-4. ✅ At least one location field
+4. ✅ **At least one location field** (`location`, `city`, `state`, or `country`) - **REQUIRED**
+5. ✅ **`niche` or `campaign_name`** - **REQUIRED** (for campaign keyword)
 
-**✅ Should Have:**
-1. ✅ `niche` or `campaign_name` for campaign organization
-2. ✅ `location` field for proper campaign creation
-3. ✅ Error handling and retry logic
-4. ✅ Data validation before sending
+**🟡 SHOULD HAVE (Recommended for reliability):**
+1. ✅ `location` field (full string) for proper campaign creation
+2. ✅ Error handling and retry logic
+3. ✅ Data validation before sending
+4. ✅ Proper error logging and monitoring
 
 **✅ Nice to Have:**
 1. ✅ All enrichment data (emails, tags, analysis)
