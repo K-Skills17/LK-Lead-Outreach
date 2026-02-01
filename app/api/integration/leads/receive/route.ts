@@ -123,25 +123,37 @@ export async function POST(request: NextRequest) {
       errors: [] as string[],
     };
 
+    console.log(`[Integration] Processing ${leads.length} lead(s)`);
+    
     for (const leadData of leads) {
       try {
+        console.log(`[Integration] Validating lead: ${leadData.nome || 'unknown'}`);
         // Validate lead data
         const validated = enrichedLeadSchema.parse(leadData);
+        console.log(`[Integration] ✅ Validation passed for ${validated.nome}`);
 
         // Normalize phone
         const normalizedPhone = normalizePhone(validated.phone);
 
         // Check if phone is blocked
-        const { data: blocked } = await supabaseAdmin
+        const { data: blocked, error: blockedError } = await supabaseAdmin
           .from('do_not_contact')
           .select('id')
           .eq('phone', normalizedPhone)
           .single();
 
+        if (blockedError && blockedError.code !== 'PGRST116') {
+          // PGRST116 = no rows returned (expected if not blocked)
+          console.error('[Integration] Error checking blocked list:', blockedError);
+        }
+
         if (blocked) {
+          console.log(`[Integration] ⚠️ Phone ${validated.phone} is blocked - skipping`);
           results.errors.push(`Phone ${validated.phone} is blocked`);
           continue;
         }
+        
+        console.log(`[Integration] Phone ${normalizedPhone} is not blocked - proceeding`);
 
         // Find or create campaign
         let campaignId: string;
@@ -221,12 +233,27 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if lead already exists in this campaign
-        const { data: existingLead } = await supabaseAdmin
+        console.log(`[Integration] Checking for existing lead in campaign ${campaignId}`);
+        const { data: existingLeads, error: existingLeadError } = await supabaseAdmin
           .from('campaign_contacts')
           .select('id')
           .eq('campaign_id', campaignId)
           .eq('phone', normalizedPhone)
-          .single();
+          .limit(1);
+        
+        if (existingLeadError) {
+          console.error('[Integration] Error checking existing lead:', existingLeadError);
+          results.errors.push(`Error checking existing lead: ${existingLeadError.message}`);
+          continue;
+        }
+        
+        const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null;
+        
+        if (existingLead) {
+          console.log(`[Integration] Lead already exists: ${existingLead.id} - will update`);
+        } else {
+          console.log(`[Integration] Lead does not exist - will create new`);
+        }
 
         // Calculate scheduled send time for WhatsApp (respect delay)
         const delayHours = validated.whatsapp_followup_delay_hours || 24;
@@ -321,6 +348,10 @@ export async function POST(request: NextRequest) {
           scheduled_send_at: scheduledSendAt.toISOString(),
           assigned_sdr_id: assignedSdrId || null,
         };
+        
+        console.log(`[Integration] Preparing to insert/update lead for ${validated.nome}`);
+        console.log(`[Integration] Campaign ID: ${campaignId}`);
+        console.log(`[Integration] Phone: ${normalizedPhone}`);
 
         let leadId: string;
 
