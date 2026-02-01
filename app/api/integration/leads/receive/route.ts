@@ -371,21 +371,31 @@ export async function POST(request: NextRequest) {
           try {
             const { generatePersonalization, savePersonalization } = await import('@/lib/personalization-service');
             
+            // Get enrichment data from the saved lead (it's stored in enrichment_data JSONB column)
+            const { data: savedLead } = await supabaseAdmin
+              .from('campaign_contacts')
+              .select('enrichment_data')
+              .eq('id', leadId)
+              .single();
+            
+            const enrichmentData = savedLead?.enrichment_data || {};
+            
             // Prepare personalization input from lead data
+            // Use enrichmentData from database or fallback to validated fields
             const personalizationInput: any = {
               name: validated.nome,
               empresa: validated.empresa,
-              industry: validated.industry,
-              google_maps_ranking: validated.enrichment_data?.google_maps_ranking,
-              rating: validated.enrichment_data?.rating,
-              competitors: validated.enrichment_data?.competitors,
-              website_performance: validated.enrichment_data?.website_performance,
-              marketing_tags: validated.marketing_tags,
-              pain_points: validated.pain_points,
+              industry: validated.industry || enrichmentData.industry,
+              google_maps_ranking: enrichmentData.google_maps_ranking,
+              rating: enrichmentData.rating,
+              competitors: enrichmentData.competitors,
+              website_performance: enrichmentData.website_performance,
+              marketing_tags: validated.marketing_tags || enrichmentData.marketing_tags,
+              pain_points: validated.pain_points || enrichmentData.pain_points,
               quality_score: validated.quality_score,
               fit_score: validated.fit_score,
               enrichment_score: validated.enrichment_score,
-              niche: validated.niche,
+              niche: validated.niche || enrichmentData.niche,
               campaign_name: validated.campaign_name,
             };
             
