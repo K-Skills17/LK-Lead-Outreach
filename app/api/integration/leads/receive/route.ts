@@ -454,10 +454,8 @@ export async function POST(request: NextRequest) {
               website_performance: enrichmentData.website_performance,
               marketing_tags: validated.marketing_tags || enrichmentData.marketing_tags,
               pain_points: validated.pain_points || enrichmentData.pain_points,
-              quality_score: qualityResult.score, // Use calculated score
+              quality_score: validated.quality_score,
               fit_score: validated.fit_score,
-              quality_tier: qualityResult.tier,
-              is_icp: contactDecision.isICP || false,
               enrichment_score: validated.enrichment_score,
               niche: validated.niche || enrichmentData.niche,
               campaign_name: validated.campaign_name,
