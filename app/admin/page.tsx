@@ -119,6 +119,7 @@ export default function AdminDashboard() {
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AIStrategySuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'ai-strategist'>('overview');
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -371,10 +372,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
-      {/* Modern Header */}
+      {/* Modern Header with Navigation */}
       <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Sparkles className="w-6 h-6 text-white" />
@@ -396,6 +397,49 @@ export default function AdminDashboard() {
               Logout
             </button>
           </div>
+          
+          {/* Navigation Tabs */}
+          <nav className="flex space-x-1 border-b border-gray-200">
+            {[
+              { id: 'overview', label: 'Overview', icon: BarChart3 },
+              { id: 'ai-strategist', label: 'AI Strategist', icon: Sparkles },
+              { id: 'ab-lab', label: 'A/B Lab', icon: Target, href: '/admin/ab-lab' },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.href ? false : selectedTab === tab.id;
+              
+              if (tab.href) {
+                return (
+                  <a
+                    key={tab.id}
+                    href={tab.href}
+                    className="flex items-center gap-2 px-4 py-3 font-semibold text-sm transition-colors relative"
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </a>
+                );
+              }
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm transition-colors relative ${
+                    isActive
+                      ? 'text-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-full" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </header>
 
@@ -558,8 +602,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Modern Tabs */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
+        {/* Tab Content */}
+        {selectedTab === 'overview' && (
+          <>
+            {/* Modern Tabs */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
           <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-blue-50/30">
             <div className="flex space-x-2 px-6">
               {(['overview', 'sdrs', 'leads', 'campaigns'] as const).map((tab) => (
