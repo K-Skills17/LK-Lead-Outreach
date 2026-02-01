@@ -515,13 +515,29 @@ export async function POST(request: NextRequest) {
           : 'Unknown error';
 
         results.errors.push(errorMsg);
-        console.error('[Integration] Error processing lead:', error);
+        console.error('[Integration] ❌ Error processing lead:', error);
+        if (error instanceof z.ZodError) {
+          console.error('[Integration] Validation errors:', error.issues);
+        }
       }
     }
+    
+    console.log(`[Integration] 📊 Final results:`, {
+      processed: results.processed,
+      created: results.created,
+      updated: results.updated,
+      errors: results.errors.length,
+      errorDetails: results.errors
+    });
 
     return NextResponse.json({
       success: true,
-      results,
+      processed: results.processed,
+      created: results.created,
+      updated: results.updated,
+      emails_sent: results.emails_sent,
+      errors: results.errors,
+      results, // Keep nested for backward compatibility
       message: `Processed ${results.processed} leads`,
     });
   } catch (error) {
