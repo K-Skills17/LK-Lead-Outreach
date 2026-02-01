@@ -317,7 +317,8 @@ export async function POST(request: NextRequest) {
         if (validated.fit_score !== undefined) enrichmentData.fit_score = validated.fit_score;
         
         // Reports & personalization
-        if (validated.landing_page_url) enrichmentData.landing_page_url = validated.landing_page_url;
+        if (validated.analysis_image_url) enrichmentData.analysis_image_url = validated.analysis_image_url;
+        if (validated.landing_page_url) enrichmentData.landing_page_url = validated.landing_page_url; // Deprecated - kept for backward compatibility
         if (validated.personalization_data) enrichmentData.personalization_data = validated.personalization_data;
         
         // Outreach history
