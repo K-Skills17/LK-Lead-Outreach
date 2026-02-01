@@ -781,8 +781,12 @@ export default function AdminDashboard() {
                     <tbody>
                       {data.leads.map((lead) => {
                         const assignedSdr = data.sdrs.find(s => s.id === lead.assigned_sdr_id);
-                        const tier = lead.personalization?.tier;
-                        const score = lead.personalization?.score;
+                        // Get tier from quality scoring (preferred) or personalization (fallback)
+                        const enrichment = (lead as any).enrichment_data || {};
+                        const tier = enrichment.quality_tier || lead.personalization?.tier;
+                        const score = enrichment.quality_score || lead.personalization?.score;
+                        const qualityScore = enrichment.quality_score;
+                        const isICP = enrichment.is_icp || false;
                         return (
                           <tr 
                             key={lead.id} 
@@ -814,9 +818,16 @@ export default function AdminDashboard() {
                             <td className="py-3 px-4 text-gray-600 font-mono text-sm">{lead.phone}</td>
                             <td className="py-3 px-4">
                               {tier ? (
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getTierBadgeColor(tier)}`}>
-                                  {tier}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getTierBadgeColor(tier)}`}>
+                                    {tier}
+                                  </span>
+                                  {isICP && (
+                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full" title="Ideal Customer Profile">
+                                      ICP
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-xs text-gray-400">-</span>
                               )}
@@ -827,10 +838,12 @@ export default function AdminDashboard() {
                                   <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
                                     <div 
                                       className={`h-full ${getTierColor(tier)}`}
-                                      style={{ width: `${score}%` }}
+                                      style={{ width: `${Math.min(score, 100)}%` }}
                                     />
                                   </div>
-                                  <span className="text-xs font-semibold text-gray-700">{score}%</span>
+                                  <span className="text-xs font-semibold text-gray-700">
+                                    {qualityScore !== undefined ? qualityScore : score}%
+                                  </span>
                                 </div>
                               ) : (
                                 <span className="text-xs text-gray-400">-</span>
