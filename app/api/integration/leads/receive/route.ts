@@ -12,7 +12,7 @@ const enrichedLeadSchema = z.object({
   // Required fields
   nome: z.string().min(1, 'Nome is required'),
   empresa: z.string().min(1, 'Empresa is required'),
-  email: z.string().email('Invalid email'),
+  email: z.string().email('Invalid email').nullable().or(z.literal('')).optional(),
   phone: z.string().min(1, 'Phone is required'),
   
   // Business information
@@ -43,8 +43,8 @@ const enrichedLeadSchema = z.object({
   fit_score: z.number().min(0).max(100).optional(),
   
   // Reports & personalization
-  report_url: z.string().url().optional(),
-  landing_page_url: z.string().url().optional(),
+  report_url: z.string().url().nullable().or(z.literal('')).optional(),
+  landing_page_url: z.string().url().nullable().or(z.literal('')).optional(),
   personalization_data: z.any().optional(),
   
   // Outreach history
