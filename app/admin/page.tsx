@@ -44,6 +44,7 @@ interface Lead {
   empresa: string;
   cargo?: string;
   phone: string;
+  email?: string;
   status: string;
   assigned_sdr_id?: string;
   created_at: string;
