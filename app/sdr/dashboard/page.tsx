@@ -19,6 +19,8 @@ import {
   QrCode,
   Wifi,
   WifiOff,
+  Eye,
+  MousePointerClick,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -83,7 +85,9 @@ export default function SDRDashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies' | 'emails'>('overview');
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<{
     connected: boolean;
     phone: string | null;
@@ -105,6 +109,7 @@ export default function SDRDashboardPage() {
     setUser(JSON.parse(userData));
     loadDashboardData(token);
     loadWhatsappStatus(token);
+    loadEmails(token);
   }, [router]);
 
   const loadDashboardData = async (token: string) => {
@@ -255,6 +260,32 @@ export default function SDRDashboardPage() {
     } catch (error) {
       console.error('Error disconnecting WhatsApp:', error);
       alert('Failed to disconnect WhatsApp');
+    }
+  };
+
+  const loadEmails = async (token: string) => {
+    try {
+      setLoadingEmails(true);
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/emails', {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEmails(data.emails || []);
+      }
+    } catch (error) {
+      console.error('Error loading emails:', error);
+    } finally {
+      setLoadingEmails(false);
     }
   };
 
@@ -460,6 +491,16 @@ export default function SDRDashboardPage() {
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab('emails')}
+                className={`px-4 py-3 font-semibold text-sm transition-colors relative ${
+                  activeTab === 'emails'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Emails ({emails.length})
+              </button>
             </div>
           </div>
 
@@ -644,6 +685,109 @@ export default function SDRDashboardPage() {
                           <p className="text-xs text-gray-500 mt-2">
                             Campaign: {reply.campaign_contacts.campaigns.name}
                           </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Emails Tab */}
+            {activeTab === 'emails' && (
+              <div>
+                {loadingEmails ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                    <p className="text-gray-600">Loading emails...</p>
+                  </div>
+                ) : emails.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No emails sent to your leads yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {emails.map((email) => (
+                      <div
+                        key={email.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-semibold text-gray-900">{email.subject}</p>
+                              <div className="flex items-center gap-2">
+                                {email.is_opened && (
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                                    <Eye className="w-3 h-3" />
+                                    Opened
+                                  </span>
+                                )}
+                                {email.is_clicked && (
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
+                                    <MousePointerClick className="w-3 h-3" />
+                                    Clicked
+                                  </span>
+                                )}
+                                {!email.is_opened && (
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                    Not Opened
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">
+                              To: <span className="font-medium">{email.lead_email}</span>
+                            </p>
+                            {email.campaign_contacts && (
+                              <p className="text-sm text-gray-600">
+                                Lead: <span className="font-medium">{email.campaign_contacts.nome} - {email.campaign_contacts.empresa}</span>
+                              </p>
+                            )}
+                            {email.campaigns && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Campaign: {email.campaigns.name}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatDate(email.sent_at)}
+                            </p>
+                            {email.open_count > 0 && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                Opened {email.open_count}x
+                              </p>
+                            )}
+                            {email.click_count > 0 && (
+                              <p className="text-xs text-gray-600">
+                                Clicked {email.click_count}x
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                          <p className="text-xs text-gray-500 mb-2">Email Content:</p>
+                          <div 
+                            className="text-sm text-gray-700 prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: email.html_content || email.text_content || 'No content' }}
+                          />
+                        </div>
+                        {email.clicked_urls && email.clicked_urls.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-1">Clicked URLs:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {email.clicked_urls.map((url: string, idx: number) => (
+                                <a
+                                  key={idx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  {url}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                     ))}

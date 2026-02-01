@@ -826,17 +826,34 @@ export default function AdminDashboard() {
                               {formatDate(lead.created_at)}
                             </td>
                             <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => {
-                                  setSelectedLeads(new Set([lead.id]));
-                                  setShowAssignModal(true);
-                                }}
-                                className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors"
-                                title="Assign to SDR"
-                              >
-                                <UserPlus className="w-3.5 h-3.5" />
-                                Assign
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {lead.email && (
+                                  <button
+                                    onClick={() => {
+                                      setEmailLead(lead);
+                                      setEmailSubject(`Oportunidade para ${lead.empresa || lead.nome}`);
+                                      setEmailContent(`Olá ${lead.nome || 'Cliente'}!\n\nVi que você trabalha na ${lead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\nEquipe LK Digital`);
+                                      setShowEmailModal(true);
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200 flex items-center gap-1.5 transition-colors"
+                                    title="Send Email"
+                                  >
+                                    <Mail className="w-3.5 h-3.5" />
+                                    Email
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setSelectedLeads(new Set([lead.id]));
+                                    setShowAssignModal(true);
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors"
+                                  title="Assign to SDR"
+                                >
+                                  <UserPlus className="w-3.5 h-3.5" />
+                                  Assign
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
