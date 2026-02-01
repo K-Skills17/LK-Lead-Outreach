@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendEmail } from '@/lib/email-service-simple';
 import { normalizePhone } from '@/lib/phone';
-import { scoreBusinessQuality, shouldContactLead, getTier } from '@/lib/lead-quality-scoring';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,24 +41,6 @@ const enrichedLeadSchema = z.object({
   enrichment_score: z.number().min(0).max(100).optional(),
   quality_score: z.number().min(0).max(100).optional(),
   fit_score: z.number().min(0).max(100).optional(),
-  
-  // Google/Website Analysis (from Stitch with Google)
-  verified: z.boolean().optional(),
-  rating: z.number().min(0).max(5).optional(),
-  reviews: z.number().optional(),
-  rank: z.number().optional(), // Google Maps ranking position
-  domain_age_days: z.number().optional(),
-  has_https: z.boolean().optional(),
-  has_contact_page: z.boolean().optional(),
-  has_booking_system: z.boolean().optional(),
-  website_analysis: z.object({
-    speed_mobile: z.number().optional(),
-    seo_score: z.number().optional(),
-  }).optional(),
-  competitors: z.array(z.object({
-    competitor_rating: z.number().optional(),
-    competitor_reviews: z.number().optional(),
-  })).optional(),
   
   // Reports & personalization
   report_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(),

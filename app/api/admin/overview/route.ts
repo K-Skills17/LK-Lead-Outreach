@@ -141,28 +141,13 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('is_read', false);
 
-    // Calculate AI stats (from personalization)
-    const vipLeadsPersonalization = enrichedLeads.filter((l: any) => l.personalization?.tier === 'VIP').length;
-    const hotLeadsPersonalization = enrichedLeads.filter((l: any) => l.personalization?.tier === 'HOT').length;
+    // Calculate AI stats
+    const vipLeads = enrichedLeads.filter((l: any) => l.personalization?.tier === 'VIP').length;
+    const hotLeads = enrichedLeads.filter((l: any) => l.personalization?.tier === 'HOT').length;
     const avgPersonalizationScore = enrichedLeads
       .filter((l: any) => l.personalization?.score)
       .reduce((sum: number, l: any) => sum + (l.personalization?.score || 0), 0) / 
       Math.max(1, enrichedLeads.filter((l: any) => l.personalization?.score).length);
-    
-    // Calculate Quality Score stats (from lead quality scoring)
-    const qualityTiers = enrichedLeads.map((l: any) => {
-      const enrichment = l.enrichment_data || {};
-      return enrichment.quality_tier || null;
-    }).filter(Boolean);
-    
-    const vipLeadsQuality = qualityTiers.filter((t: string) => t === 'VIP').length;
-    const hotLeadsQuality = qualityTiers.filter((t: string) => t === 'HOT').length;
-    const warmLeadsQuality = qualityTiers.filter((t: string) => t === 'WARM').length;
-    const coldLeadsQuality = qualityTiers.filter((t: string) => t === 'COLD').length;
-    
-    // Use quality tier if available, otherwise fall back to personalization tier
-    const vipLeads = vipLeadsQuality > 0 ? vipLeadsQuality : vipLeadsPersonalization;
-    const hotLeads = hotLeadsQuality > 0 ? hotLeadsQuality : hotLeadsPersonalization;
 
     return NextResponse.json({
       sdrs: sdrStats,
