@@ -44,7 +44,8 @@ const enrichedLeadSchema = z.object({
   
   // Reports & personalization
   report_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(),
-  landing_page_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(),
+  analysis_image_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(), // Leonardo AI analysis image (replaces landing_page_url)
+  landing_page_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(), // Deprecated - kept for backward compatibility
   personalization_data: z.any().optional(),
   
   // Outreach history

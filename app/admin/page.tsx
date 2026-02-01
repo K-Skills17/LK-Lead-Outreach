@@ -774,6 +774,7 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Assigned</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Campaign</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Análise</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                       </tr>
@@ -854,6 +855,17 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3 px-4 text-xs text-gray-600 font-medium">
                               {lead.campaigns?.name || '-'}
+                            </td>
+                            <td className="py-3 px-4">
+                              {((lead as any).analysis_image_url || (lead as any).landing_page_url) ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium flex items-center gap-1 w-fit">
+                                  📊 Disponível
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full font-medium">
+                                  -
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-xs text-gray-500">
                               {formatDate(lead.created_at)}
