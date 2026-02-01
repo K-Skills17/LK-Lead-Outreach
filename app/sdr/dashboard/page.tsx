@@ -85,9 +85,11 @@ export default function SDRDashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies' | 'emails'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies' | 'emails' | 'whatsapp'>('overview');
   const [emails, setEmails] = useState<any[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
+  const [whatsappSends, setWhatsappSends] = useState<any[]>([]);
+  const [loadingWhatsappSends, setLoadingWhatsappSends] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<{
     connected: boolean;
     phone: string | null;
@@ -110,6 +112,7 @@ export default function SDRDashboardPage() {
     loadDashboardData(token);
     loadWhatsappStatus(token);
     loadEmails(token);
+    loadWhatsappSends(token);
   }, [router]);
 
   const loadDashboardData = async (token: string) => {
@@ -310,6 +313,32 @@ export default function SDRDashboardPage() {
     } catch (error) {
       console.error('Error disconnecting WhatsApp:', error);
       alert('Failed to disconnect WhatsApp');
+    }
+  };
+
+  const loadWhatsappSends = async (token: string) => {
+    try {
+      setLoadingWhatsappSends(true);
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch(`/api/whatsapp/history?sdrId=${sdrId}&limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setWhatsappSends(result.history || []);
+      }
+    } catch (err) {
+      console.error('Error loading WhatsApp sends:', err);
+    } finally {
+      setLoadingWhatsappSends(false);
     }
   };
 
@@ -564,6 +593,20 @@ export default function SDRDashboardPage() {
               >
                 Emails ({emails.length})
               </button>
+              <button
+                onClick={() => {
+                  setActiveTab('whatsapp');
+                  const token = localStorage.getItem('sdr_token');
+                  if (token) loadWhatsappSends(token);
+                }}
+                className={`px-4 py-3 font-semibold text-sm transition-colors relative ${
+                  activeTab === 'whatsapp'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                WhatsApp ({whatsappSends.length})
+              </button>
             </div>
           </div>
 
@@ -689,6 +732,11 @@ export default function SDRDashboardPage() {
                               {lead.campaigns && (
                                 <p className="text-xs text-gray-500">
                                   Campaign: {lead.campaigns.name}
+                                </p>
+                              )}
+                              {(lead as any).lastEmailSentAt && (
+                                <p className="text-xs text-green-600 font-medium mt-1">
+                                  📧 Email sent: {formatDate((lead as any).lastEmailSentAt)}
                                 </p>
                               )}
                             </div>
@@ -852,6 +900,92 @@ export default function SDRDashboardPage() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WhatsApp Tab */}
+            {activeTab === 'whatsapp' && (
+              <div>
+                {loadingWhatsappSends ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                    <p className="text-gray-600">Loading WhatsApp sends...</p>
+                  </div>
+                ) : whatsappSends.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No WhatsApp messages sent yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {whatsappSends.map((send: any) => (
+                      <div
+                        key={send.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-semibold text-gray-900">{send.lead_name} - {send.lead_company}</p>
+                              <div className="flex items-center gap-2">
+                                {send.is_delivered && (
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Delivered
+                                  </span>
+                                )}
+                                {send.is_read && (
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
+                                    <Eye className="w-3 h-3" />
+                                    Read
+                                  </span>
+                                )}
+                                {send.is_failed && (
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                                    Failed
+                                  </span>
+                                )}
+                                {send.sent_by_system && (
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                                    Auto
+                                  </span>
+                                )}
+                                {!send.sent_by_system && (
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                    Manual
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">
+                              To: <span className="font-medium">{send.lead_phone}</span>
+                            </p>
+                            <p className="text-sm text-gray-700 mt-2 bg-white p-3 rounded border border-gray-200">
+                              {send.message_text || send.personalized_message}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Sent: {formatDate(send.sent_at)}
+                              {send.delay_seconds && ` • Delay: ${send.delay_seconds}s`}
+                              {send.break_type && ` • After ${send.break_type} break`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatDate(send.sent_at)}
+                            </p>
+                            {send.sent_by_system && (
+                              <p className="text-xs text-purple-600 mt-1">
+                                Automatic
+                              </p>
+                            )}
+                            {!send.sent_by_system && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                Manual
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

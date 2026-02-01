@@ -99,11 +99,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Enrich leads with AI data
+    // Fetch last email sent time for each lead
+    const leadIdsForEmails = (leads || []).map((l: any) => l.id);
+    const emailSentTimes: Record<string, string> = {};
+    
+    if (leadIdsForEmails.length > 0) {
+      // Get the most recent email sent time for each contact
+      const { data: emailSends } = await supabaseAdmin
+        .from('email_sends')
+        .select('campaign_contact_id, sent_at')
+        .in('campaign_contact_id', leadIdsForEmails)
+        .order('sent_at', { ascending: false });
+
+      if (emailSends) {
+        // Get the most recent email for each contact
+        emailSends.forEach((email: any) => {
+          if (!emailSentTimes[email.campaign_contact_id] || 
+              new Date(email.sent_at) > new Date(emailSentTimes[email.campaign_contact_id])) {
+            emailSentTimes[email.campaign_contact_id] = email.sent_at;
+          }
+        });
+      }
+    }
+
+    // Enrich leads with AI data and email sent times
     const enrichedLeads = (leads || []).map((lead: any) => ({
       ...lead,
       personalization: personalizationData[lead.id] || null,
       sendTime: sendTimeData[lead.id] || null,
+      lastEmailSentAt: emailSentTimes[lead.id] || null,
     }));
 
     if (leadsError) {

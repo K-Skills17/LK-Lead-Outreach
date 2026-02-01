@@ -221,7 +221,35 @@ export async function getSDRLeads(sdrId: string, status?: string) {
       return [];
     }
 
-    return data || [];
+    const leads = data || [];
+    
+    // Fetch last email sent time for each lead
+    if (leads.length > 0) {
+      const leadIds = leads.map((l: any) => l.id);
+      const { data: emailSends } = await supabaseAdmin
+        .from('email_sends')
+        .select('campaign_contact_id, sent_at')
+        .in('campaign_contact_id', leadIds)
+        .order('sent_at', { ascending: false });
+
+      const emailSentTimes: Record<string, string> = {};
+      if (emailSends) {
+        emailSends.forEach((email: any) => {
+          if (!emailSentTimes[email.campaign_contact_id] || 
+              new Date(email.sent_at) > new Date(emailSentTimes[email.campaign_contact_id])) {
+            emailSentTimes[email.campaign_contact_id] = email.sent_at;
+          }
+        });
+      }
+
+      // Add email sent time to each lead
+      return leads.map((lead: any) => ({
+        ...lead,
+        lastEmailSentAt: emailSentTimes[lead.id] || null,
+      }));
+    }
+
+    return leads;
   } catch (error) {
     console.error('[SDR] Error:', error);
     return [];

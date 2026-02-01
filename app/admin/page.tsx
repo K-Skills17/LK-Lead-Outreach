@@ -69,6 +69,7 @@ interface Lead {
     confidenceScore?: number;
     historicalOpenRate?: number;
   } | null;
+  lastEmailSentAt?: string | null;
 }
 
 interface Campaign {
@@ -113,7 +114,7 @@ export default function AdminDashboard() {
   const [authToken, setAuthToken] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns' | 'emails'>('overview');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'sdrs' | 'leads' | 'campaigns' | 'emails' | 'whatsapp'>('overview');
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [assignSdrId, setAssignSdrId] = useState('');
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -129,6 +130,9 @@ export default function AdminDashboard() {
   const [emailHistory, setEmailHistory] = useState<any[]>([]);
   const [emailStats, setEmailStats] = useState<any>(null);
   const [loadingEmailHistory, setLoadingEmailHistory] = useState(false);
+  const [whatsappHistory, setWhatsappHistory] = useState<any[]>([]);
+  const [whatsappStats, setWhatsappStats] = useState<any>(null);
+  const [loadingWhatsappHistory, setLoadingWhatsappHistory] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -163,6 +167,8 @@ export default function AdminDashboard() {
       
       // Load email history
       loadEmailHistory(token);
+      // Load WhatsApp history
+      loadWhatsappHistory(token);
     } catch (err) {
       console.error('Error loading overview:', err);
       setError('Failed to load data');
@@ -209,6 +215,55 @@ export default function AdminDashboard() {
       console.error('Error loading email history:', err);
     } finally {
       setLoadingEmailHistory(false);
+    }
+  };
+
+  const loadWhatsappHistory = async (token: string) => {
+    try {
+      setLoadingWhatsappHistory(true);
+      const response = await fetch('/api/whatsapp/history?limit=100', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setWhatsappHistory(result.history || []);
+        
+        // Use stats from API response, or calculate if not available
+        if (result.stats) {
+          setWhatsappStats({
+            totalWhatsapp: result.stats.total,
+            delivered: result.stats.delivered,
+            read: result.stats.read,
+            auto: result.stats.auto,
+            manual: result.stats.manual,
+            failed: result.history?.filter((s: any) => s.is_failed).length || 0,
+          });
+        } else {
+          // Fallback: calculate stats
+          const total = result.history?.length || 0;
+          const delivered = result.history?.filter((s: any) => s.is_delivered).length || 0;
+          const read = result.history?.filter((s: any) => s.is_read).length || 0;
+          const failed = result.history?.filter((s: any) => s.is_failed).length || 0;
+          const auto = result.history?.filter((s: any) => s.sent_by_system).length || 0;
+          const manual = result.history?.filter((s: any) => !s.sent_by_system).length || 0;
+          
+          setWhatsappStats({
+            totalWhatsapp: total,
+            delivered,
+            read,
+            failed,
+            auto,
+            manual,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading WhatsApp history:', err);
+    } finally {
+      setLoadingWhatsappHistory(false);
     }
   };
 
@@ -639,7 +694,7 @@ export default function AdminDashboard() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 mb-6 overflow-hidden">
           <div className="border-b border-gray-200/50 bg-gradient-to-r from-gray-50 to-blue-50/30">
             <div className="flex space-x-2 px-6">
-              {(['overview', 'sdrs', 'leads', 'campaigns', 'emails'] as const).map((tab) => (
+              {(['overview', 'sdrs', 'leads', 'campaigns', 'emails', 'whatsapp'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setSelectedTab(tab)}
@@ -775,6 +830,7 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Assigned</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Campaign</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Análise</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Email Sent</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                       </tr>
@@ -865,6 +921,15 @@ export default function AdminDashboard() {
                                 <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full font-medium">
                                   -
                                 </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-xs text-gray-500">
+                              {(lead as any).lastEmailSentAt ? (
+                                <span className="text-green-600 font-medium">
+                                  {formatDate((lead as any).lastEmailSentAt)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
                               )}
                             </td>
                             <td className="py-3 px-4 text-xs text-gray-500">
@@ -1031,6 +1096,109 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WhatsApp Tab */}
+            {selectedTab === 'whatsapp' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">WhatsApp Send History</h3>
+                  {whatsappStats && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg">
+                        <span className="font-semibold">{whatsappStats.totalWhatsapp}</span> Total
+                      </div>
+                      <div className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg">
+                        <span className="font-semibold">{whatsappStats.delivered}</span> Delivered
+                      </div>
+                      <div className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg">
+                        <span className="font-semibold">{whatsappStats.read}</span> Read
+                      </div>
+                      <div className="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg">
+                        <span className="font-semibold">{whatsappStats.auto}</span> Auto
+                      </div>
+                      <div className="px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg">
+                        <span className="font-semibold">{whatsappStats.manual || 0}</span> Manual
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {loadingWhatsappHistory ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                    <p className="text-gray-600">Loading WhatsApp history...</p>
+                  </div>
+                ) : whatsappHistory.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No WhatsApp messages sent yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {whatsappHistory.map((send: any) => (
+                      <div
+                        key={send.id}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-semibold text-gray-900">{send.lead_name} - {send.lead_company}</p>
+                              <div className="flex items-center gap-2">
+                                {send.is_delivered && (
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Delivered
+                                  </span>
+                                )}
+                                {send.is_read && (
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
+                                    <Eye className="w-3 h-3" />
+                                    Read
+                                  </span>
+                                )}
+                                {send.is_failed && (
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                                    Failed
+                                  </span>
+                                )}
+                                {send.sent_by_system && (
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                                    Auto
+                                  </span>
+                                )}
+                                {!send.sent_by_system && (
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                    Manual
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">
+                              To: <span className="font-medium">{send.lead_phone}</span>
+                            </p>
+                            <p className="text-sm text-gray-700 mt-2 bg-white p-3 rounded border border-gray-200">
+                              {send.message_text || send.personalized_message}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Sent: {formatDate(send.sent_at)}
+                              {send.delay_seconds && ` • Delay: ${send.delay_seconds}s`}
+                              {send.break_type && ` • After ${send.break_type} break`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {formatDate(send.sent_at)}
+                            </p>
+                            {send.sent_by_system && (
+                              <p className="text-xs text-purple-600 mt-1">
+                                Automatic
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
