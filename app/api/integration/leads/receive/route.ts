@@ -726,6 +726,15 @@ export async function POST(request: NextRequest) {
         console.log(`[Integration] Preparing to insert/update lead for ${leadName}`);
         console.log(`[Integration] Campaign ID: ${campaignId}`);
         console.log(`[Integration] Phone: ${normalizedPhone}`);
+        console.log(`[Integration] Lead data keys:`, Object.keys(leadToUpsert));
+        console.log(`[Integration] Lead data sample:`, {
+          nome: leadToUpsert.nome,
+          empresa: leadToUpsert.empresa,
+          phone: leadToUpsert.phone,
+          email: leadToUpsert.email,
+          campaign_id: leadToUpsert.campaign_id,
+          status: leadToUpsert.status,
+        });
 
         let leadId: string;
 
@@ -738,7 +747,13 @@ export async function POST(request: NextRequest) {
             .select('id')
             .single();
 
-          leadId = updated?.id || existingLead.id;
+          if (updated) {
+            leadId = updated.id;
+            console.log(`[Integration] ✅ Updated lead ${leadId} for ${leadName}`);
+          } else {
+            leadId = existingLead.id;
+            console.log(`[Integration] ⚠️ Update returned no data, using existing ID: ${leadId}`);
+          }
           results.updated++;
           results.lead_ids.push(leadId);
         } else {
@@ -751,9 +766,13 @@ export async function POST(request: NextRequest) {
 
           if (insertError) {
             console.error('[Integration] ❌ Error inserting lead:', insertError);
+            console.error('[Integration] Error code:', insertError.code);
+            console.error('[Integration] Error details:', insertError.details);
+            console.error('[Integration] Error hint:', insertError.hint);
             console.error('[Integration] Lead data:', JSON.stringify(leadToUpsert, null, 2));
             console.error('[Integration] Campaign ID:', campaignId);
-            results.errors.push(`Failed to create lead for ${validated.nome}: ${insertError.message}`);
+            console.error('[Integration] Full error object:', JSON.stringify(insertError, null, 2));
+            results.errors.push(`Failed to create lead for ${leadName}: ${insertError.message} (Code: ${insertError.code})`);
             continue;
           }
 
