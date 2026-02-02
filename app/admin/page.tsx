@@ -28,6 +28,7 @@ import {
   Settings,
   Send,
   Trash2,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface SDR {
@@ -148,6 +149,7 @@ export default function AdminDashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingLeads, setDeletingLeads] = useState(false);
   const [leadsToDelete, setLeadsToDelete] = useState<string[]>([]);
+  const [generatingImage, setGeneratingImage] = useState<string | null>(null); // contactId being generated
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
@@ -494,6 +496,47 @@ export default function AdminDashboard() {
       console.error(err);
     } finally {
       setDeletingLeads(false);
+    }
+  };
+
+  const handleGenerateImage = async (contactId: string, force: boolean = false) => {
+    try {
+      setGeneratingImage(contactId);
+      setError('');
+
+      const response = await fetch('/api/admin/leads/generate-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contactId,
+          force,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate image');
+      }
+
+      if (result.alreadyExists) {
+        alert('ℹ️ Image already exists for this lead');
+      } else {
+        alert(`✅ Image generated successfully!`);
+      }
+
+      // Reload data to show new image
+      await loadOverview(authToken);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate image';
+      setError(errorMessage);
+      alert(`❌ ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setGeneratingImage(null);
     }
   };
 
@@ -1175,6 +1218,24 @@ export default function AdminDashboard() {
                                     Email
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => handleGenerateImage(lead.id, false)}
+                                  disabled={generatingImage === lead.id}
+                                  className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 border border-purple-200 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Generate Analysis Image"
+                                >
+                                  {generatingImage === lead.id ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ImageIcon className="w-3.5 h-3.5" />
+                                      Image
+                                    </>
+                                  )}
+                                </button>
                                 <button
                                   onClick={() => {
                                     setSelectedLeads(new Set([lead.id]));

@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = sendEmailSchema.parse(body);
 
-    // Get contact details
+    // Get contact details (including analysis_image_url)
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
-      .select('id, nome, empresa, email, assigned_sdr_id, campaign_id')
+      .select('id, nome, empresa, email, assigned_sdr_id, campaign_id, analysis_image_url, report_url')
       .eq('id', validated.contactId)
       .maybeSingle(); // Use maybeSingle() to handle not found gracefully
 
@@ -185,7 +185,51 @@ export async function POST(request: NextRequest) {
     // Case 2: Direct send (subject + htmlContent)
     else if (validated.subject && validated.htmlContent) {
       finalSubject = validated.subject;
-      finalHtml = validated.htmlContent;
+      
+      // Automatically include analysis image if available
+      let htmlWithImage = validated.htmlContent;
+      if (contact.analysis_image_url) {
+        // Insert image before closing body tag or at the end
+        const imageHtml = `
+          <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
+            <h3 style="color: #1e293b; margin-bottom: 15px; font-size: 18px;">📊 Análise Visual Personalizada</h3>
+            <img src="${contact.analysis_image_url}" 
+                 alt="Análise Digital - ${contact.empresa || contact.nome}" 
+                 style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />
+            <div style="margin-top: 15px;">
+              <a href="${contact.analysis_image_url}" 
+                 style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                Ver Análise Completa
+              </a>
+            </div>
+          </div>
+        `;
+        
+        // Try to insert before closing body tag, otherwise append
+        if (htmlWithImage.includes('</body>')) {
+          htmlWithImage = htmlWithImage.replace('</body>', `${imageHtml}</body>`);
+        } else {
+          htmlWithImage = htmlWithImage + imageHtml;
+        }
+      } else if (contact.report_url) {
+        // Fallback to report URL if no image
+        const reportHtml = `
+          <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
+            <a href="${contact.report_url}" 
+               style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              📄 Ver Relatório Completo
+            </a>
+          </div>
+        `;
+        
+        if (htmlWithImage.includes('</body>')) {
+          htmlWithImage = htmlWithImage.replace('</body>', `${reportHtml}</body>`);
+        } else {
+          htmlWithImage = htmlWithImage + reportHtml;
+        }
+      }
+      
+      finalHtml = htmlWithImage;
       finalText = validated.textContent;
     }
     // Case 3: A/B test variations (should use send-with-ab-test endpoint)
