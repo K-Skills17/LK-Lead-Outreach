@@ -111,28 +111,78 @@ export async function POST(request: NextRequest) {
  * Handle lead.enriched event
  */
 async function handleLeadEnriched(data: any) {
-  // Forward to leads/receive endpoint logic
-  // This ensures enriched leads are processed the same way
-  const response = await fetch(
-    new URL('/api/integration/leads/receive', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
-    {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:113',message:'handleLeadEnriched entry',data:{hasData:!!data,hasPhone:!!data?.phone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  try {
+    // Forward to leads/receive endpoint logic
+    // This ensures enriched leads are processed the same way
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const receiveUrl = new URL('/api/integration/leads/receive', baseUrl);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:120',message:'Before fetch to receive endpoint',data:{url:receiveUrl.toString(),hasToken:!!process.env.LEAD_GEN_INTEGRATION_TOKEN},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    const response = await fetch(receiveUrl.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.LEAD_GEN_INTEGRATION_TOKEN}`,
       },
       body: JSON.stringify(data),
-    }
-  );
+    });
 
-  const result = await response.json();
-  return NextResponse.json(result);
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:133',message:'After fetch response',data:{status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    if (!response.ok) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:138',message:'Fetch failed - response not ok',data:{status:response.status,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      const errorText = await response.text();
+      console.error('[Webhook] Failed to forward to leads/receive:', response.status, errorText);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Failed to process enriched lead',
+          details: `Received ${response.status} from leads/receive endpoint`
+        },
+        { status: response.status }
+      );
+    }
+
+    const result = await response.json();
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:152',message:'handleLeadEnriched success',data:{success:result.success,processed:result.processed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    return NextResponse.json(result);
+  } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:157',message:'handleLeadEnriched error caught',data:{errorMessage:error instanceof Error ? error.message : String(error),errorType:error instanceof Error ? error.constructor.name : typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    console.error('[Webhook] Error in handleLeadEnriched:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to process enriched lead',
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
+  }
 }
 
 /**
  * Handle lead.analyzed event
  */
 async function handleLeadAnalyzed(data: any) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:135',message:'handleLeadAnalyzed entry',data:{hasPhone:!!data?.phone,hasAnalysis:!!(data?.business_analysis || data?.analysis_summary)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   // Update lead with analysis data
   if (data.phone) {
     const normalizedPhone = normalizePhone(data.phone);
@@ -145,11 +195,30 @@ async function handleLeadAnalyzed(data: any) {
     // Update enrichment_data JSONB if it exists
     if (data.business_analysis || data.analysis_summary) {
       // Get existing enrichment_data and merge
-      const { data: existingLead } = await supabaseAdmin
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:148',message:'Before query existing lead',data:{normalizedPhone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
+      const { data: existingLead, error: queryError } = await supabaseAdmin
         .from('campaign_contacts')
         .select('enrichment_data')
         .eq('phone', normalizedPhone)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to avoid error if not found
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:155',message:'After query existing lead',data:{found:!!existingLead,hasError:!!queryError,errorCode:queryError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+
+      if (queryError && queryError.code !== 'PGRST116') {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:160',message:'Query error (not PGRST116)',data:{errorCode:queryError.code,errorMessage:queryError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        console.error('[Webhook] Error querying lead for analysis:', queryError);
+        return NextResponse.json(
+          { error: 'Failed to query lead', details: queryError.message },
+          { status: 500 }
+        );
+      }
 
       const existingEnrichment = existingLead?.enrichment_data || {};
       updateData.enrichment_data = {
@@ -160,10 +229,30 @@ async function handleLeadAnalyzed(data: any) {
       };
     }
 
-    await supabaseAdmin
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:177',message:'Before update lead',data:{normalizedPhone,hasUpdateData:!!updateData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
+    const { error: updateError } = await supabaseAdmin
       .from('campaign_contacts')
       .update(updateData)
       .eq('phone', normalizedPhone);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:185',message:'After update lead',data:{hasError:!!updateError,errorCode:updateError?.code,rowsAffected:updateError ? 0 : 1},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
+    if (updateError) {
+      console.error('[Webhook] Error updating lead analysis:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update analysis data', details: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:195',message:'handleLeadAnalyzed success',data:{normalizedPhone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     return NextResponse.json({ success: true, message: 'Analysis data updated' });
   }
@@ -178,6 +267,9 @@ async function handleLeadAnalyzed(data: any) {
  * Handle report_ready event
  */
 async function handleReportReady(data: any) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:180',message:'handleReportReady entry',data:{hasPhone:!!data?.phone,hasReportUrl:!!data?.report_url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   // Store report URL in database
   if (data.phone && data.report_url) {
     const normalizedPhone = normalizePhone(data.phone);
@@ -188,11 +280,30 @@ async function handleReportReady(data: any) {
     };
 
     // Also store in enrichment_data for easy access
-    const { data: existingLead } = await supabaseAdmin
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:193',message:'Before query existing lead for report',data:{normalizedPhone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    const { data: existingLead, error: queryError } = await supabaseAdmin
       .from('campaign_contacts')
       .select('enrichment_data')
       .eq('phone', normalizedPhone)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid error if not found
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:200',message:'After query existing lead for report',data:{found:!!existingLead,hasError:!!queryError,errorCode:queryError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
+    if (queryError && queryError.code !== 'PGRST116') {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:205',message:'Query error (not PGRST116)',data:{errorCode:queryError.code,errorMessage:queryError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      console.error('[Webhook] Error querying lead for report:', queryError);
+      return NextResponse.json(
+        { error: 'Failed to query lead', details: queryError.message },
+        { status: 500 }
+      );
+    }
 
     const existingEnrichment = existingLead?.enrichment_data || {};
     updateData.enrichment_data = {
@@ -201,10 +312,18 @@ async function handleReportReady(data: any) {
       report_ready_at: new Date().toISOString(),
     };
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:220',message:'Before update lead with report',data:{normalizedPhone,hasUpdateData:!!updateData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
     const { error } = await supabaseAdmin
       .from('campaign_contacts')
       .update(updateData)
       .eq('phone', normalizedPhone);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:228',message:'After update lead with report',data:{hasError:!!error,errorCode:error?.code,rowsAffected:error ? 0 : 1},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     if (error) {
       console.error('[Webhook] Error storing report URL:', error);
@@ -213,6 +332,10 @@ async function handleReportReady(data: any) {
         { status: 500 }
       );
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:238',message:'handleReportReady success',data:{normalizedPhone,reportUrl:data.report_url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     console.log('[Webhook] Report URL stored for:', normalizedPhone);
     return NextResponse.json({ 
@@ -253,12 +376,35 @@ async function handleEmailSent(data: any) {
  * Handle campaign_completed event
  */
 async function handleCampaignCompleted(data: any) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:255',message:'handleCampaignCompleted entry',data:{hasCampaignId:!!data?.campaign_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
   // Update campaign status or trigger next steps
   if (data.campaign_id) {
-    await supabaseAdmin
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:260',message:'Before update campaign status',data:{campaignId:data.campaign_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
+    const { error } = await supabaseAdmin
       .from('campaigns')
       .update({ status: 'completed' })
       .eq('id', data.campaign_id);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:267',message:'After update campaign status',data:{hasError:!!error,errorCode:error?.code,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
+    if (error) {
+      console.error('[Webhook] Error updating campaign status:', error);
+      return NextResponse.json(
+        { error: 'Failed to update campaign status', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/5b40dd41-a1df-478d-a020-5d0b8f3a73d6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhook/route.ts:277',message:'handleCampaignCompleted success',data:{campaignId:data.campaign_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     return NextResponse.json({ success: true, message: 'Campaign marked as completed' });
   }

@@ -42,9 +42,17 @@ export async function POST(request: NextRequest) {
       .from('campaign_contacts')
       .select('id, nome, empresa, email, assigned_sdr_id, campaign_id')
       .eq('id', validated.contactId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() to handle not found gracefully
 
-    if (contactError || !contact) {
+    if (contactError) {
+      console.error('[Admin Email] Error fetching contact:', contactError);
+      return NextResponse.json(
+        { error: 'Database error fetching contact', details: contactError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!contact) {
       return NextResponse.json(
         { error: 'Contact not found' },
         { status: 404 }
@@ -144,9 +152,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get admin info (if available from token or session)
-    // For now, we'll use a placeholder
-    const adminEmail = 'admin@lkdigital.org'; // TODO: Get from admin session
+    // Get admin email - use replyTo or query first admin user
+    let adminEmail = replyTo; // Default to replyTo email
+    try {
+      // Try to get first admin user's email for tracking
+      const { data: firstAdmin } = await supabaseAdmin
+        .from('admin_users')
+        .select('email')
+        .limit(1)
+        .single();
+      if (firstAdmin?.email) {
+        adminEmail = firstAdmin.email;
+      }
+    } catch (error) {
+      // If query fails, use replyTo as fallback
+      console.warn('[Admin Email] Could not fetch admin email, using replyTo:', replyTo);
+    }
 
     // Create email tracking record
     const { data: emailRecord, error: insertError } = await supabaseAdmin

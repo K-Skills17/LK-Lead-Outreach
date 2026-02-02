@@ -450,14 +450,17 @@ export async function POST(request: NextRequest) {
         
         if (leadGenId) {
           // First try to find by lead_gen_id (most reliable)
-          const { data: existingByGenId } = await supabaseAdmin
+          const { data: existingByGenId, error: genIdError } = await supabaseAdmin
             .from('campaign_contacts')
             .select('id')
             .eq('lead_gen_id', leadGenId)
             .limit(1)
-            .single();
+            .maybeSingle(); // Use maybeSingle() to avoid error if not found
           
-          if (existingByGenId) {
+          if (genIdError && genIdError.code !== 'PGRST116') {
+            console.error('[Integration] Error checking by lead_gen_id:', genIdError);
+            // Continue to phone check if this fails
+          } else if (existingByGenId) {
             existingLead = existingByGenId;
             console.log(`[Integration] Found existing lead by lead_gen_id: ${existingLead.id}`);
           }
