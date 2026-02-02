@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS email_templates (
 -- Add columns if they don't exist (in case table was created before)
 DO $$ 
 BEGIN
+  -- Add created_by_admin_email if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'email_templates' AND column_name = 'created_by_admin_email') THEN
+    ALTER TABLE email_templates ADD COLUMN created_by_admin_email TEXT;
+  END IF;
+  
   -- Add is_active if it doesn't exist
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                  WHERE table_name = 'email_templates' AND column_name = 'is_active') THEN
@@ -41,14 +47,31 @@ BEGIN
                  WHERE table_name = 'email_templates' AND column_name = 'last_used_at') THEN
     ALTER TABLE email_templates ADD COLUMN last_used_at TIMESTAMPTZ;
   END IF;
+  
+  -- Add variables if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'email_templates' AND column_name = 'variables') THEN
+    ALTER TABLE email_templates ADD COLUMN variables JSONB DEFAULT '[]'::jsonb;
+  END IF;
 END $$;
 
--- Create indexes (drop first if they exist to avoid errors)
-DROP INDEX IF EXISTS idx_email_templates_active;
-CREATE INDEX idx_email_templates_active ON email_templates(is_active);
-
-DROP INDEX IF EXISTS idx_email_templates_created_by;
-CREATE INDEX idx_email_templates_created_by ON email_templates(created_by_admin_email);
+-- Create indexes (drop first if they exist to avoid errors, only create if columns exist)
+DO $$ 
+BEGIN
+  -- Create is_active index if column exists
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_name = 'email_templates' AND column_name = 'is_active') THEN
+    DROP INDEX IF EXISTS idx_email_templates_active;
+    CREATE INDEX idx_email_templates_active ON email_templates(is_active);
+  END IF;
+  
+  -- Create created_by_admin_email index if column exists
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_name = 'email_templates' AND column_name = 'created_by_admin_email') THEN
+    DROP INDEX IF EXISTS idx_email_templates_created_by;
+    CREATE INDEX idx_email_templates_created_by ON email_templates(created_by_admin_email);
+  END IF;
+END $$;
 
 -- Email A/B Tests Table (extends existing ab_test_campaigns for email-specific tests)
 -- Note: We'll use the existing ab_test_campaigns table but add email-specific fields
