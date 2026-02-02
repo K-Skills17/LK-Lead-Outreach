@@ -43,11 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
+    // Type assertion for contact with landing_page_url
+    const contactWithLandingPage = contact as typeof contact & { landing_page_url?: string | null };
+
     // Check if landing page already exists
-    if (contact.landing_page_url && !validated.force) {
+    if (contactWithLandingPage.landing_page_url && !validated.force) {
       return NextResponse.json({
         success: true,
-        landingPageUrl: contact.landing_page_url,
+        landingPageUrl: contactWithLandingPage.landing_page_url,
         alreadyExists: true,
         message: 'Landing page already exists for this lead',
       });

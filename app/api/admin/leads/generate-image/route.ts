@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         'pain_points, opportunities, competitor_count, ' +
         'rating, reviews, rank, ' +
         'business_quality_score, business_quality_tier, is_icp, segment, ' +
-        'personalization, enrichment_data'
+        'personalization, enrichment_data, analysis_image_url'
       )
       .eq('id', validated.contactId)
       .maybeSingle();
@@ -45,11 +45,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
+    // Type assertion for contact with analysis_image_url
+    const contactWithImage = contact as typeof contact & { analysis_image_url?: string | null };
+
     // Check if image already exists
-    if (contact.analysis_image_url && !validated.force) {
+    if (contactWithImage.analysis_image_url && !validated.force) {
       return NextResponse.json({
         success: true,
-        imageUrl: contact.analysis_image_url,
+        imageUrl: contactWithImage.analysis_image_url,
         alreadyExists: true,
         message: 'Image already exists for this lead',
       });
