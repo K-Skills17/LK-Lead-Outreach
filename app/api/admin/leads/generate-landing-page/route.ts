@@ -43,14 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
-    // Type assertion for contact with landing_page_url
-    const contactWithLandingPage = contact as typeof contact & { landing_page_url?: string | null };
+    // Type assertion for contact with all needed properties
+    const contactData = contact as any;
 
     // Check if landing page already exists
-    if (contactWithLandingPage.landing_page_url && !validated.force) {
+    if (contactData.landing_page_url && !validated.force) {
       return NextResponse.json({
         success: true,
-        landingPageUrl: contactWithLandingPage.landing_page_url,
+        landingPageUrl: contactData.landing_page_url,
         alreadyExists: true,
         message: 'Landing page already exists for this lead',
       });
@@ -59,9 +59,9 @@ export async function POST(request: NextRequest) {
     // Check if should generate (unless forced)
     if (!validated.force) {
       const shouldGenerate = shouldGenerateLandingPage({
-        seoScore: contact.seo_score,
-        pageScore: contact.page_score,
-        hasWebsite: !!contact.site,
+        seoScore: contactData.seo_score,
+        pageScore: contactData.page_score,
+        hasWebsite: !!contactData.site,
       });
 
       if (!shouldGenerate) {
@@ -77,22 +77,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract enrichment data
-    const enrichmentData = (contact.enrichment_data || {}) as any;
+    const enrichmentData = (contactData.enrichment_data || {}) as any;
     const leadInfo = enrichmentData?.lead || {};
     const analysisData = enrichmentData?.analysis || {};
 
     // Generate landing page
     const result = await generateLandingPage({
-      leadName: contact.nome || undefined,
-      leadCompany: contact.empresa,
-      leadLocation: contact.location || `${contact.city || ''}, ${contact.state || ''}`.trim() || undefined,
-      leadWebsite: contact.site || leadInfo?.website || undefined,
-      leadNiche: contact.niche || leadInfo?.niche || undefined,
-      leadIndustry: contact.business_type || contact.category || contact.niche || undefined,
-      seoScore: contact.seo_score || analysisData?.seo_score || undefined,
-      pageScore: contact.page_score || analysisData?.page_score || undefined,
-      businessDescription: contact.description || leadInfo?.description || analysisData?.business_analysis || undefined,
-      logoUrl: contact.logo_url || leadInfo?.logo_url || undefined,
+      leadName: contactData.nome || undefined,
+      leadCompany: contactData.empresa,
+      leadLocation: contactData.location || `${contactData.city || ''}, ${contactData.state || ''}`.trim() || undefined,
+      leadWebsite: contactData.site || leadInfo?.website || undefined,
+      leadNiche: contactData.niche || leadInfo?.niche || undefined,
+      leadIndustry: contactData.business_type || contactData.category || contactData.niche || undefined,
+      seoScore: contactData.seo_score || analysisData?.seo_score || undefined,
+      pageScore: contactData.page_score || analysisData?.page_score || undefined,
+      businessDescription: contactData.description || leadInfo?.description || analysisData?.business_analysis || undefined,
+      logoUrl: contactData.logo_url || leadInfo?.logo_url || undefined,
     });
 
     if (!result.success || !result.landingPageUrl) {

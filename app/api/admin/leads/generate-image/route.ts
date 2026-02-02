@@ -45,14 +45,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
-    // Type assertion for contact with analysis_image_url
-    const contactWithImage = contact as typeof contact & { analysis_image_url?: string | null };
+    // Type assertion for contact with all needed properties
+    const contactData = contact as any;
 
     // Check if image already exists
-    if (contactWithImage.analysis_image_url && !validated.force) {
+    if (contactData.analysis_image_url && !validated.force) {
       return NextResponse.json({
         success: true,
-        imageUrl: contactWithImage.analysis_image_url,
+        imageUrl: contactData.analysis_image_url,
         alreadyExists: true,
         message: 'Image already exists for this lead',
       });
@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
     // Check qualification (unless forced)
     if (!validated.force) {
       const qualifies = shouldGenerateImage({
-        personalization: contact.personalization as any,
-        pain_points: contact.pain_points,
-        business_quality_tier: contact.business_quality_tier,
-        business_quality_score: contact.business_quality_score,
+        personalization: contactData.personalization,
+        pain_points: contactData.pain_points,
+        business_quality_tier: contactData.business_quality_tier,
+        business_quality_score: contactData.business_quality_score,
       });
 
       if (!qualifies) {
@@ -80,17 +80,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract enrichment data
-    const enrichmentData = (contact.enrichment_data || {}) as any;
+    const enrichmentData = (contactData.enrichment_data || {}) as any;
     const leadInfo = enrichmentData?.lead || {};
     const analysisData = enrichmentData?.analysis || {};
 
     // Extract pain points
     let painPoints: string[] = [];
-    if (contact.pain_points) {
-      if (Array.isArray(contact.pain_points)) {
-        painPoints = contact.pain_points;
-      } else if (typeof contact.pain_points === 'object') {
-        painPoints = Object.entries(contact.pain_points)
+    if (contactData.pain_points) {
+      if (Array.isArray(contactData.pain_points)) {
+        painPoints = contactData.pain_points;
+      } else if (typeof contactData.pain_points === 'object') {
+        painPoints = Object.entries(contactData.pain_points)
           .filter(([_, value]) => value === true || value === 'true')
           .map(([key, _]) => key);
       }
@@ -98,11 +98,11 @@ export async function POST(request: NextRequest) {
 
     // Extract opportunities
     let opportunities: string[] = [];
-    if (contact.opportunities) {
-      if (Array.isArray(contact.opportunities)) {
-        opportunities = contact.opportunities;
-      } else if (typeof contact.opportunities === 'object') {
-        opportunities = Object.entries(contact.opportunities)
+    if (contactData.opportunities) {
+      if (Array.isArray(contactData.opportunities)) {
+        opportunities = contactData.opportunities;
+      } else if (typeof contactData.opportunities === 'object') {
+        opportunities = Object.entries(contactData.opportunities)
           .filter(([_, value]) => value === true || value === 'true')
           .map(([key, _]) => key);
       }
@@ -110,11 +110,11 @@ export async function POST(request: NextRequest) {
 
     // Generate image
     const imageResult = await generateLeonardoImage({
-      leadName: contact.nome || undefined,
-      leadCompany: contact.empresa,
-      leadLocation: contact.location || `${contact.city || ''}, ${contact.state || ''}`.trim() || undefined,
-      leadWebsite: contact.site || leadInfo?.website || undefined,
-      leadNiche: contact.niche || leadInfo?.niche || undefined,
+      leadName: contactData.nome || undefined,
+      leadCompany: contactData.empresa,
+      leadLocation: contactData.location || `${contactData.city || ''}, ${contactData.state || ''}`.trim() || undefined,
+      leadWebsite: contactData.site || leadInfo?.website || undefined,
+      leadNiche: contactData.niche || leadInfo?.niche || undefined,
       painPoints: painPoints.length > 0 ? painPoints : undefined,
       competitorCount: contact.competitor_count || analysisData?.competitors?.length || undefined,
       googleRanking: contact.rank || leadInfo?.rank || undefined,
