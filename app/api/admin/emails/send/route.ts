@@ -9,12 +9,32 @@ export const runtime = 'nodejs';
 // Email send request schema
 const sendEmailSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
-  subject: z.string().min(1, 'Subject is required'),
-  htmlContent: z.string().min(1, 'HTML content is required'),
+  subject: z.string().min(1, 'Subject is required').optional(), // Optional if using template
+  htmlContent: z.string().min(1, 'HTML content is required').optional(), // Optional if using template
   textContent: z.string().optional(),
   fromEmail: z.string().email().optional(),
   replyTo: z.string().email().optional(),
-});
+  // Template support
+  templateId: z.string().uuid().optional(),
+  templateVariables: z.record(z.string(), z.string()).optional(), // For template variable substitution
+  // A/B Testing support
+  abTestId: z.string().uuid().optional(), // If sending as part of A/B test
+  abTestVariantName: z.string().optional(), // Which variant to send
+  // Send all 3 variations for A/B testing
+  sendABTestVariations: z.boolean().optional(), // If true, send all 3 variations
+  variations: z.array(z.object({
+    variation_name: z.string(),
+    subject: z.string(),
+    html_content: z.string(),
+    text_content: z.string().optional(),
+  })).optional(), // 3 variations for A/B testing
+}).refine(
+  (data) => {
+    // Must have either (subject + htmlContent) OR templateId OR variations
+    return (data.subject && data.htmlContent) || data.templateId || (data.variations && data.variations.length > 0);
+  },
+  { message: 'Must provide subject+htmlContent, templateId, or variations' }
+);
 
 /**
  * POST /api/admin/emails/send
@@ -129,6 +149,53 @@ export async function POST(request: NextRequest) {
     
     // Log optimal time (but allow immediate send since we already passed failsafe checks)
     
+    // Handle template, variations, or direct send
+    let finalSubject: string;
+    let finalHtml: string;
+    let finalText: string | undefined;
+    let templateId: string | undefined;
+    let abTestId: string | undefined;
+    let abTestVariantName: string | undefined;
+
+    // Case 1: Using template
+    if (validated.templateId) {
+      const { getEmailTemplate, renderTemplate } = await import('@/lib/email-template-service');
+      const template = await getEmailTemplate(validated.templateId);
+      
+      if (!template) {
+        return NextResponse.json(
+          { error: 'Template not found' },
+          { status: 404 }
+        );
+      }
+
+      // Prepare variables (merge contact data with provided variables)
+      const variables = {
+        nome: contact.nome || '',
+        empresa: contact.empresa || '',
+        ...validated.templateVariables,
+      };
+
+      const rendered = renderTemplate(template, variables);
+      finalSubject = rendered.subject;
+      finalHtml = rendered.html;
+      finalText = rendered.text;
+      templateId = validated.templateId;
+    }
+    // Case 2: Direct send (subject + htmlContent)
+    else if (validated.subject && validated.htmlContent) {
+      finalSubject = validated.subject;
+      finalHtml = validated.htmlContent;
+      finalText = validated.textContent;
+    }
+    // Case 3: A/B test variations (should use send-with-ab-test endpoint)
+    else {
+      return NextResponse.json(
+        { error: 'Must provide subject+htmlContent, templateId, or use /send-with-ab-test endpoint for variations' },
+        { status: 400 }
+      );
+    }
+
     // Send email via Resend
     const fromEmail = validated.fromEmail || process.env.EMAIL_FROM || 'LK Lead Outreach <noreply@lkdigital.org>';
     const replyTo = validated.replyTo || process.env.EMAIL_REPLY_TO || 'contato@lkdigital.org';
@@ -137,8 +204,8 @@ export async function POST(request: NextRequest) {
     try {
       const emailResult = await sendEmail({
         to: contact.email,
-        subject: validated.subject,
-        html: validated.htmlContent,
+        subject: finalSubject,
+        html: finalHtml,
         from: fromEmail,
         replyTo: replyTo,
       });
@@ -150,6 +217,12 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to send email', details: emailError instanceof Error ? emailError.message : String(emailError) },
         { status: 500 }
       );
+    }
+
+    // Handle A/B test if provided
+    if (validated.abTestId && validated.abTestVariantName) {
+      abTestId = validated.abTestId;
+      abTestVariantName = validated.abTestVariantName;
     }
 
     // Get admin email - use replyTo or query first admin user
@@ -178,9 +251,12 @@ export async function POST(request: NextRequest) {
         lead_name: contact.nome,
         lead_company: contact.empresa,
         assigned_sdr_id: contact.assigned_sdr_id,
-        subject: validated.subject,
-        html_content: validated.htmlContent,
-        text_content: validated.textContent || null,
+        subject: finalSubject,
+        html_content: finalHtml,
+        text_content: finalText || null,
+        email_template_id: templateId || null,
+        ab_test_id: abTestId || null,
+        ab_test_variant_name: abTestVariantName || null,
         from_email: fromEmail,
         reply_to: replyTo,
         resend_email_id: resendEmailId,
