@@ -215,17 +215,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
+    // Type assertion for contact with all needed properties
+    const contactData = contact as any;
+
     const qualifies = shouldGenerateImage({
-      personalization: contact.personalization as any,
-      pain_points: contact.pain_points,
-      business_quality_tier: contact.business_quality_tier,
-      business_quality_score: contact.business_quality_score,
+      personalization: contactData.personalization,
+      pain_points: contactData.pain_points,
+      business_quality_tier: contactData.business_quality_tier,
+      business_quality_score: contactData.business_quality_score,
     });
 
     return NextResponse.json({
       qualifies,
-      hasImage: !!contact.analysis_image_url,
-      imageUrl: contact.analysis_image_url || null,
+      hasImage: !!contactData.analysis_image_url,
+      imageUrl: contactData.analysis_image_url || null,
     });
   } catch (error) {
     console.error('[GenerateImage] Error:', error);
