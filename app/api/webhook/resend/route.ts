@@ -3,5 +3,9 @@
  * This allows the webhook to work with both /api/webhook/resend and /api/webhooks/resend
  */
 
-// Re-export the handler from the plural path
-export { POST } from '@/app/api/webhooks/resend/route';
+import { POST as webhookPOST } from '../webhooks/resend/route';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export const POST = webhookPOST;
