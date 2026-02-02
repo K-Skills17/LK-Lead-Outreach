@@ -94,63 +94,99 @@ BEGIN
 END $$;
 
 -- Email A/B Test Assignments (link email sends to A/B test variants)
+-- Only add columns if email_sends table exists
 DO $$ 
 BEGIN
-  -- Add ab_test_id if it doesn't exist
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name = 'email_sends' AND column_name = 'ab_test_id') THEN
-    ALTER TABLE email_sends ADD COLUMN ab_test_id UUID REFERENCES ab_test_campaigns(id) ON DELETE SET NULL;
-  END IF;
-  
-  -- Add ab_test_variant_name if it doesn't exist
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name = 'email_sends' AND column_name = 'ab_test_variant_name') THEN
-    ALTER TABLE email_sends ADD COLUMN ab_test_variant_name TEXT;
-  END IF;
-  
-  -- Add email_template_id if it doesn't exist
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name = 'email_sends' AND column_name = 'email_template_id') THEN
-    ALTER TABLE email_sends ADD COLUMN email_template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL;
+  -- Check if email_sends table exists before adding columns
+  IF EXISTS (SELECT 1 FROM information_schema.tables 
+             WHERE table_name = 'email_sends') THEN
+    -- Add ab_test_id if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'email_sends' AND column_name = 'ab_test_id') THEN
+      ALTER TABLE email_sends ADD COLUMN ab_test_id UUID REFERENCES ab_test_campaigns(id) ON DELETE SET NULL;
+    END IF;
+    
+    -- Add ab_test_variant_name if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'email_sends' AND column_name = 'ab_test_variant_name') THEN
+      ALTER TABLE email_sends ADD COLUMN ab_test_variant_name TEXT;
+    END IF;
+    
+    -- Add email_template_id if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'email_sends' AND column_name = 'email_template_id') THEN
+      ALTER TABLE email_sends ADD COLUMN email_template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL;
+    END IF;
   END IF;
 END $$;
 
--- Create indexes (drop first if they exist)
-DROP INDEX IF EXISTS idx_email_sends_ab_test;
-CREATE INDEX idx_email_sends_ab_test ON email_sends(ab_test_id);
-
-DROP INDEX IF EXISTS idx_email_sends_ab_test_variant;
-CREATE INDEX idx_email_sends_ab_test_variant ON email_sends(ab_test_id, ab_test_variant_name);
-
-DROP INDEX IF EXISTS idx_email_sends_template;
-CREATE INDEX idx_email_sends_template ON email_sends(email_template_id);
+-- Create indexes (only if email_sends table exists and columns exist)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_sends') THEN
+    -- Create ab_test_id index if column exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'email_sends' AND column_name = 'ab_test_id') THEN
+      DROP INDEX IF EXISTS idx_email_sends_ab_test;
+      CREATE INDEX idx_email_sends_ab_test ON email_sends(ab_test_id);
+    END IF;
+    
+    -- Create ab_test_variant index if columns exist
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'email_sends' AND column_name = 'ab_test_id')
+       AND EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'email_sends' AND column_name = 'ab_test_variant_name') THEN
+      DROP INDEX IF EXISTS idx_email_sends_ab_test_variant;
+      CREATE INDEX idx_email_sends_ab_test_variant ON email_sends(ab_test_id, ab_test_variant_name);
+    END IF;
+    
+    -- Create template index if column exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'email_sends' AND column_name = 'email_template_id') THEN
+      DROP INDEX IF EXISTS idx_email_sends_template;
+      CREATE INDEX idx_email_sends_template ON email_sends(email_template_id);
+    END IF;
+  END IF;
+END $$;
 
 -- Email Response Tracking (to track which variations get responses)
-CREATE TABLE IF NOT EXISTS email_responses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email_send_id UUID NOT NULL REFERENCES email_sends(id) ON DELETE CASCADE,
-  ab_test_id UUID REFERENCES ab_test_campaigns(id) ON DELETE SET NULL,
-  ab_test_variant_name TEXT,
-  
-  -- Response data
-  response_type TEXT NOT NULL CHECK (response_type IN ('reply', 'click', 'booking', 'conversion')),
-  response_content TEXT, -- For replies, store the reply text
-  response_url TEXT, -- For clicks, store the clicked URL
-  response_at TIMESTAMPTZ DEFAULT NOW(),
-  
-  -- Metadata
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Only create if email_sends table exists
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_sends') THEN
+    -- Create email_responses table if it doesn't exist
+    CREATE TABLE IF NOT EXISTS email_responses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email_send_id UUID NOT NULL REFERENCES email_sends(id) ON DELETE CASCADE,
+      ab_test_id UUID REFERENCES ab_test_campaigns(id) ON DELETE SET NULL,
+      ab_test_variant_name TEXT,
+      
+      -- Response data
+      response_type TEXT NOT NULL CHECK (response_type IN ('reply', 'click', 'booking', 'conversion')),
+      response_content TEXT, -- For replies, store the reply text
+      response_url TEXT, -- For clicks, store the clicked URL
+      response_at TIMESTAMPTZ DEFAULT NOW(),
+      
+      -- Metadata
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  END IF;
+END $$;
 
--- Create indexes for email_responses (drop first if they exist)
-DROP INDEX IF EXISTS idx_email_responses_email_send;
-CREATE INDEX idx_email_responses_email_send ON email_responses(email_send_id);
+-- Create indexes for email_responses (only if table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_responses') THEN
+    DROP INDEX IF EXISTS idx_email_responses_email_send;
+    CREATE INDEX idx_email_responses_email_send ON email_responses(email_send_id);
 
-DROP INDEX IF EXISTS idx_email_responses_ab_test;
-CREATE INDEX idx_email_responses_ab_test ON email_responses(ab_test_id, ab_test_variant_name);
+    DROP INDEX IF EXISTS idx_email_responses_ab_test;
+    CREATE INDEX idx_email_responses_ab_test ON email_responses(ab_test_id, ab_test_variant_name);
 
-DROP INDEX IF EXISTS idx_email_responses_type;
-CREATE INDEX idx_email_responses_type ON email_responses(response_type);
+    DROP INDEX IF EXISTS idx_email_responses_type;
+    CREATE INDEX idx_email_responses_type ON email_responses(response_type);
+  END IF;
+END $$;
 
 -- Function to update template usage stats
 CREATE OR REPLACE FUNCTION update_email_template_stats()
@@ -167,9 +203,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop trigger if it exists, then create
-DROP TRIGGER IF EXISTS trigger_update_email_template_stats ON email_sends;
-CREATE TRIGGER trigger_update_email_template_stats
-AFTER INSERT ON email_sends
-FOR EACH ROW
-EXECUTE FUNCTION update_email_template_stats();
+-- Drop trigger if it exists, then create (only if email_sends table exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'email_sends') THEN
+    DROP TRIGGER IF EXISTS trigger_update_email_template_stats ON email_sends;
+    CREATE TRIGGER trigger_update_email_template_stats
+    AFTER INSERT ON email_sends
+    FOR EACH ROW
+    EXECUTE FUNCTION update_email_template_stats();
+  END IF;
+END $$;
