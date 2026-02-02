@@ -150,6 +150,7 @@ export default function AdminDashboard() {
   const [deletingLeads, setDeletingLeads] = useState(false);
   const [leadsToDelete, setLeadsToDelete] = useState<string[]>([]);
   const [generatingImage, setGeneratingImage] = useState<string | null>(null); // contactId being generated
+  const [generatingLandingPage, setGeneratingLandingPage] = useState<string | null>(null); // contactId being generated
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
@@ -537,6 +538,47 @@ export default function AdminDashboard() {
       console.error(err);
     } finally {
       setGeneratingImage(null);
+    }
+  };
+
+  const handleGenerateLandingPage = async (contactId: string, force: boolean = false) => {
+    try {
+      setGeneratingLandingPage(contactId);
+      setError('');
+
+      const response = await fetch('/api/admin/leads/generate-landing-page', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contactId,
+          force,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate landing page');
+      }
+
+      if (result.alreadyExists) {
+        alert('ℹ️ Landing page already exists for this lead');
+      } else {
+        alert(`✅ Landing page generated successfully!`);
+      }
+
+      // Reload data to show new landing page
+      await loadOverview(authToken);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate landing page';
+      setError(errorMessage);
+      alert(`❌ ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setGeneratingLandingPage(null);
     }
   };
 

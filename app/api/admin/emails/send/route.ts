@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = sendEmailSchema.parse(body);
 
-    // Get contact details (including analysis_image_url)
+    // Get contact details (including analysis_image_url and landing_page_url)
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
-      .select('id, nome, empresa, email, assigned_sdr_id, campaign_id, analysis_image_url, report_url')
+      .select('id, nome, empresa, email, assigned_sdr_id, campaign_id, analysis_image_url, landing_page_url, report_url')
       .eq('id', validated.contactId)
       .maybeSingle(); // Use maybeSingle() to handle not found gracefully
 
@@ -186,10 +186,12 @@ export async function POST(request: NextRequest) {
     else if (validated.subject && validated.htmlContent) {
       finalSubject = validated.subject;
       
-      // Automatically include analysis image if available
+      // Automatically include analysis image and/or landing page if available
       let htmlWithImage = validated.htmlContent;
+      
+      // Priority: Analysis Image > Landing Page > Report URL
       if (contact.analysis_image_url) {
-        // Insert image before closing body tag or at the end
+        // Insert analysis image before closing body tag or at the end
         const imageHtml = `
           <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
             <h3 style="color: #1e293b; margin-bottom: 15px; font-size: 18px;">📊 Análise Visual Personalizada</h3>
@@ -211,8 +213,33 @@ export async function POST(request: NextRequest) {
         } else {
           htmlWithImage = htmlWithImage + imageHtml;
         }
-      } else if (contact.report_url) {
-        // Fallback to report URL if no image
+      }
+      
+      // Add landing page if available (show alongside or instead of analysis image)
+      if (contact.landing_page_url) {
+        const landingPageHtml = `
+          <div style="text-align: center; margin: 30px 0; padding: 20px; background: #fff7ed; border-radius: 8px; border: 2px solid #fb923c;">
+            <h3 style="color: #1e293b; margin-bottom: 15px; font-size: 18px;">🎨 Página de Destino Personalizada</h3>
+            <p style="color: #64748b; margin-bottom: 15px; font-size: 14px;">Criamos uma prévia de como seria uma landing page otimizada para ${contact.empresa || contact.nome}</p>
+            <img src="${contact.landing_page_url}" 
+                 alt="Landing Page Mockup - ${contact.empresa || contact.nome}" 
+                 style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;" />
+            <div style="margin-top: 15px;">
+              <a href="${contact.landing_page_url}" 
+                 style="display: inline-block; padding: 12px 24px; background: #fb923c; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                Ver Landing Page Completa
+              </a>
+            </div>
+          </div>
+        `;
+        
+        if (htmlWithImage.includes('</body>')) {
+          htmlWithImage = htmlWithImage.replace('</body>', `${landingPageHtml}</body>`);
+        } else {
+          htmlWithImage = htmlWithImage + landingPageHtml;
+        }
+      } else if (contact.report_url && !contact.analysis_image_url) {
+        // Fallback to report URL if no image or landing page
         const reportHtml = `
           <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 8px;">
             <a href="${contact.report_url}" 
