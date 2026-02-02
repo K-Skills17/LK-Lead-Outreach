@@ -173,33 +173,41 @@ const enrichmentDataSchema = z.object({
 }).passthrough(); // Allow additional fields
 
 // Top-level validation schema
+// IMPORTANT: Lead Gen Tool sends empty strings ("") instead of null for optional fields
+// IMPORTANT: Lead Gen Tool sends empty objects ({}) instead of null for optional objects
 const enrichedLeadSchema = z.object({
   // Required fields
   nome: z.string().optional(), // Can fallback to empresa if not provided
   empresa: z.string().min(1, 'Empresa is required'),
-  phone: z.string().min(1, 'Phone is required'),
+  // Phone must be E.164 format (starting with +) - Lead Gen Tool sends it this way
+  phone: z.string().min(1, 'Phone is required').refine(
+    (val) => val.startsWith('+'),
+    { message: 'Phone must be in E.164 format (start with +)' }
+  ),
+  // Email can be empty string, null, or valid email
   email: z.union([z.string().email('Invalid email'), z.null(), z.literal('')]).optional(),
   
-  // Location fields
-  location: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  country: z.string().optional(),
+  // Location fields - explicitly allow empty strings
+  location: z.union([z.string(), z.literal('')]).optional(),
+  city: z.union([z.string(), z.literal('')]).optional(),
+  state: z.union([z.string(), z.literal('')]).optional(),
+  country: z.union([z.string(), z.literal('')]).optional(),
   
-  // Campaign context
-  niche: z.string().optional(),
-  campaign_name: z.string().optional(),
+  // Campaign context - explicitly allow empty strings
+  niche: z.union([z.string(), z.literal('')]).optional(),
+  campaign_name: z.union([z.string(), z.literal('')]).optional(),
   
-  // Complete enrichment data
-  enrichment_data: enrichmentDataSchema.optional(),
+  // Complete enrichment data - explicitly allow empty objects
+  enrichment_data: z.union([enrichmentDataSchema, z.object({}).passthrough()]).optional(),
   
-  // Report URLs
+  // Report URLs - explicitly allow empty strings
   report_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(),
   analysis_image_url: z.union([z.string().url(), z.null(), z.literal('')]).optional(),
   
   // Auto-assignment
   auto_assign_sdr: z.boolean().default(false).optional(),
-  sdr_email: z.string().email().optional(),
+  // SDR email can be empty string or valid email
+  sdr_email: z.union([z.string().email('Invalid email'), z.literal('')]).optional(),
   
   // Legacy fields (for backward compatibility)
   cargo: z.string().optional(),
@@ -442,7 +450,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Extract lead_gen_id from enrichment_data for duplicate detection
-        const leadGenId = validated.enrichment_data?.lead?.id || validated.lead_id || null;
+        // Handle empty objects {} - check if enrichment_data has lead property
+        const enrichmentDataForId = validated.enrichment_data as any;
+        const leadGenId = (enrichmentDataForId && typeof enrichmentDataForId === 'object' && 'lead' in enrichmentDataForId && enrichmentDataForId.lead?.id) 
+          ? enrichmentDataForId.lead.id 
+          : validated.lead_id || null;
         
         // Check if lead already exists (by lead_gen_id or phone)
         console.log(`[Integration] Checking for existing lead (lead_gen_id: ${leadGenId}, phone: ${normalizedPhone})`);
@@ -524,12 +536,13 @@ export async function POST(request: NextRequest) {
         const scheduledSendAt = optimalSendAt > minSendAt ? optimalSendAt : minSendAt;
 
         // Extract enrichment_data (complete structure from Lead Gen Engine)
-        const enrichmentData = validated.enrichment_data || {};
-        const leadInfo = enrichmentData.lead || {};
-        const enrichmentDataObj = enrichmentData.enrichment || {};
-        const analysisData = enrichmentData.analysis || {};
-        const reportsData = enrichmentData.reports || {};
-        const landingPageData = enrichmentData.landing_page || {};
+        // Handle empty objects {} - use type assertion for TypeScript
+        const enrichmentData = (validated.enrichment_data || {}) as any;
+        const leadInfo = (enrichmentData.lead || {}) as any;
+        const enrichmentDataObj = (enrichmentData.enrichment || {}) as any;
+        const analysisData = (enrichmentData.analysis || {}) as any;
+        const reportsData = (enrichmentData.reports || {}) as any;
+        const landingPageData = (enrichmentData.landing_page || {}) as any;
         
         // Extract quick-access fields from enrichment_data for database columns
         const businessQualityScore = leadInfo.business_quality_score || analysisData.business_score || validated.quality_score || null;
