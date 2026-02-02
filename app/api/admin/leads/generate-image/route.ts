@@ -116,12 +116,12 @@ export async function POST(request: NextRequest) {
       leadWebsite: contactData.site || leadInfo?.website || undefined,
       leadNiche: contactData.niche || leadInfo?.niche || undefined,
       painPoints: painPoints.length > 0 ? painPoints : undefined,
-      competitorCount: contact.competitor_count || analysisData?.competitors?.length || undefined,
-      googleRanking: contact.rank || leadInfo?.rank || undefined,
-      googleRating: contact.rating || leadInfo?.rating || undefined,
-      googleReviews: contact.reviews || leadInfo?.reviews || undefined,
-      businessQualityScore: contact.business_quality_score || leadInfo?.business_quality_score || undefined,
-      businessQualityTier: contact.business_quality_tier || leadInfo?.business_quality_tier || undefined,
+      competitorCount: contactData.competitor_count || analysisData?.competitors?.length || undefined,
+      googleRanking: contactData.rank || leadInfo?.rank || undefined,
+      googleRating: contactData.rating || leadInfo?.rating || undefined,
+      googleReviews: contactData.reviews || leadInfo?.reviews || undefined,
+      businessQualityScore: contactData.business_quality_score || leadInfo?.business_quality_score || undefined,
+      businessQualityTier: contactData.business_quality_tier || leadInfo?.business_quality_tier || undefined,
       opportunities: opportunities.length > 0 ? opportunities : undefined,
     });
 
