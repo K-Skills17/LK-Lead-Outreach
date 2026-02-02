@@ -27,6 +27,7 @@ import {
   Square,
   Settings,
   Send,
+  Trash2,
 } from 'lucide-react';
 
 interface SDR {
@@ -144,6 +145,9 @@ export default function AdminDashboard() {
   const [loadingSending, setLoadingSending] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingSettings, setEditingSettings] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingLeads, setDeletingLeads] = useState(false);
+  const [leadsToDelete, setLeadsToDelete] = useState<string[]>([]);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -445,6 +449,67 @@ export default function AdminDashboard() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDeleteLeads = async (leadIds: string[]) => {
+    if (leadIds.length === 0) {
+      setError('No leads selected for deletion');
+      return;
+    }
+
+    try {
+      setDeletingLeads(true);
+      setError('');
+      
+      // Build query string for bulk delete
+      const idsParam = leadIds.join(',');
+      const response = await fetch(`/api/admin/leads/delete?ids=${idsParam}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete leads');
+      }
+
+      const result = await response.json();
+      
+      // Reload data
+      await loadOverview(authToken);
+      setSelectedLeads(new Set());
+      setShowDeleteConfirm(false);
+      setLeadsToDelete([]);
+      
+      // Show success message
+      alert(`✅ Successfully deleted ${result.deleted || leadIds.length} lead(s)`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete leads';
+      setError(errorMessage);
+      console.error(err);
+    } finally {
+      setDeletingLeads(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    const idsToDelete = leadsToDelete.length > 0 ? leadsToDelete : Array.from(selectedLeads);
+    if (idsToDelete.length === 0) {
+      setError('No leads selected for deletion');
+      return;
+    }
+    handleDeleteLeads(idsToDelete);
+  };
+
+  const openDeleteConfirm = (leadId?: string) => {
+    if (leadId) {
+      setLeadsToDelete([leadId]);
+    } else {
+      setLeadsToDelete(Array.from(selectedLeads));
+    }
+    setShowDeleteConfirm(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -892,13 +957,22 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
                   <div className="flex gap-2">
                     {selectedLeads.size > 0 && (
-                      <button
-                        onClick={() => setShowAssignModal(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setShowAssignModal(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          Assign {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+                        </button>
+                        <button
+                          onClick={() => openDeleteConfirm()}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete {selectedLeads.size} Lead{selectedLeads.size > 1 ? 's' : ''}
+                        </button>
+                      </>
                     )}
                     {data.leads.length === 0 && (
                       <p className="text-sm text-gray-500">No leads available. Send leads from your Lead Gen Tool.</p>
@@ -1064,6 +1138,14 @@ export default function AdminDashboard() {
                                 >
                                   <UserPlus className="w-3.5 h-3.5" />
                                   Assign
+                                </button>
+                                <button
+                                  onClick={() => openDeleteConfirm(lead.id)}
+                                  className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded-lg hover:bg-red-100 border border-red-200 flex items-center gap-1.5 transition-colors"
+                                  title="Delete Lead"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Delete
                                 </button>
                               </div>
                             </td>
@@ -1776,6 +1858,16 @@ export default function AdminDashboard() {
                   Assign to SDR
                 </button>
                 <button
+                  onClick={() => {
+                    setShowLeadDetail(false);
+                    openDeleteConfirm(selectedLead.id);
+                  }}
+                  className="px-4 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Delete
+                </button>
+                <button
                   onClick={() => setShowLeadDetail(false)}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
                 >
@@ -1850,6 +1942,70 @@ export default function AdminDashboard() {
                   setAssignSdrId('');
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-red-600">Confirm Deletion</h3>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setLeadsToDelete([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to delete <strong>{leadsToDelete.length}</strong> lead{leadsToDelete.length > 1 ? 's' : ''}?
+              </p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  ⚠️ <strong>Warning:</strong> This action cannot be undone. All related data (emails, WhatsApp messages, contact history) will also be deleted.
+                </p>
+              </div>
+            </div>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDelete}
+                disabled={deletingLeads}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingLeads ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete {leadsToDelete.length} Lead{leadsToDelete.length > 1 ? 's' : ''}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setLeadsToDelete([]);
+                }}
+                disabled={deletingLeads}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
               </button>
