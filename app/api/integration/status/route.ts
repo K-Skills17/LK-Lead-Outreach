@@ -50,10 +50,13 @@ export async function GET(request: NextRequest) {
       },
       integration: {
         enabled: true,
+        token_configured: !!expectedToken,
         endpoints: {
           receive_leads: '/api/integration/leads/receive',
           webhook: '/api/integration/webhook',
           status: '/api/integration/status',
+          debug: '/api/integration/leads/debug',
+          test: '/api/integration/test',
         },
       },
     });

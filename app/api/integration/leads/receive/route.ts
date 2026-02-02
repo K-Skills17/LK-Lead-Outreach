@@ -261,14 +261,30 @@ export async function POST(request: NextRequest) {
     if (!expectedToken) {
       console.error('[Integration] LEAD_GEN_INTEGRATION_TOKEN not configured');
       return NextResponse.json(
-        { error: 'Integration not configured' },
+        { 
+          success: false,
+          error: 'Integration not configured - LEAD_GEN_INTEGRATION_TOKEN environment variable is missing',
+          code: 'NOT_CONFIGURED',
+          hint: 'Set LEAD_GEN_INTEGRATION_TOKEN in Outreach Tool environment variables'
+        },
         { status: 503 }
       );
     }
 
     if (!token || token !== expectedToken) {
+      console.error('[Integration] ❌ Authentication failed:', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        expectedTokenLength: expectedToken?.length || 0,
+        tokenMatch: token === expectedToken,
+      });
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { 
+          success: false,
+          error: 'Unauthorized - Invalid or missing authentication token',
+          code: 'UNAUTHORIZED',
+          hint: 'Verify LEAD_GEN_INTEGRATION_TOKEN matches MESSAGING_TOOL_API_KEY in Lead Gen Tool'
+        },
         { status: 401 }
       );
     }
@@ -926,8 +942,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Return response matching Lead Gen Engine specification
+    // Always return 200 OK for partial success (with errors array)
+    // Only return 400 if ALL leads failed
     if (results.errors.length > 0 && results.processed === 0) {
-      // All leads failed
+      // All leads failed - return 400
       return NextResponse.json({
         success: false,
         error: results.errors.join('; '),
@@ -939,10 +957,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Success response
+    // Success response (200 OK) - even with partial errors
     const response: any = {
       success: true,
-      message: `Processed ${results.processed} leads successfully`,
+      message: results.processed > 0 
+        ? `Processed ${results.processed} lead${results.processed > 1 ? 's' : ''} successfully`
+        : 'No leads processed',
       processed: results.processed,
       created: results.created,
       updated: results.updated,
@@ -954,12 +974,14 @@ export async function POST(request: NextRequest) {
       response.lead_id = results.lead_ids[0];
     }
     
-    // Include errors if any (partial success)
+    // Include errors if any (partial success - still 200 OK)
     if (results.errors.length > 0) {
       response.errors = results.errors;
+      response.message += ` (${results.errors.length} error${results.errors.length > 1 ? 's' : ''} occurred)`;
     }
     
-    return NextResponse.json(response);
+    // Always return 200 OK for partial success
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error('[Integration] Error:', error);
     return NextResponse.json(
