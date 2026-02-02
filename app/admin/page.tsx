@@ -148,6 +148,9 @@ export default function AdminDashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingLeads, setDeletingLeads] = useState(false);
   const [leadsToDelete, setLeadsToDelete] = useState<string[]>([]);
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
+  const [loadingDebug, setLoadingDebug] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -510,6 +513,32 @@ export default function AdminDashboard() {
       setLeadsToDelete(Array.from(selectedLeads));
     }
     setShowDeleteConfirm(true);
+  };
+
+  const loadDebugData = async () => {
+    try {
+      setLoadingDebug(true);
+      setError('');
+      const response = await fetch('/api/integration/leads/debug', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load debug data');
+      }
+
+      const result = await response.json();
+      setDebugData(result.debug);
+      setShowDebugModal(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load debug data';
+      setError(errorMessage);
+      console.error(err);
+    } finally {
+      setLoadingDebug(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -956,6 +985,24 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
                   <div className="flex gap-2">
+                    <button
+                      onClick={loadDebugData}
+                      disabled={loadingDebug}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+                      title="Debug Integration"
+                    >
+                      {loadingDebug ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="w-4 h-4" />
+                          Debug
+                        </>
+                      )}
+                    </button>
                     {selectedLeads.size > 0 && (
                       <>
                         <button
@@ -2008,6 +2055,175 @@ export default function AdminDashboard() {
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Modal */}
+      {showDebugModal && debugData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Integration Debug Information</h3>
+              <button
+                onClick={() => {
+                  setShowDebugModal(false);
+                  setDebugData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-600 font-medium mb-1">Total Leads</p>
+                  <p className="text-2xl font-bold text-blue-900">{debugData.totalLeadsInDatabase || 0}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-600 font-medium mb-1">Recent Leads</p>
+                  <p className="text-2xl font-bold text-green-900">{debugData.recentLeadsCount || 0}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <p className="text-sm text-purple-600 font-medium mb-1">Campaigns</p>
+                  <p className="text-2xl font-bold text-purple-900">{debugData.campaignsCount || 0}</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <p className="text-sm text-red-600 font-medium mb-1">Orphaned</p>
+                  <p className="text-2xl font-bold text-red-900">{debugData.orphanedLeads?.length || 0}</p>
+                </div>
+              </div>
+
+              {/* Recent Leads */}
+              {debugData.recentLeads && debugData.recentLeads.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Recent Leads (Last 10)</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50">
+                          <th className="text-left py-2 px-3">Name</th>
+                          <th className="text-left py-2 px-3">Company</th>
+                          <th className="text-left py-2 px-3">Phone</th>
+                          <th className="text-left py-2 px-3">Status</th>
+                          <th className="text-left py-2 px-3">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugData.recentLeads.map((lead: any) => (
+                          <tr key={lead.id} className="border-b border-gray-100">
+                            <td className="py-2 px-3">{lead.nome || '-'}</td>
+                            <td className="py-2 px-3">{lead.empresa || '-'}</td>
+                            <td className="py-2 px-3 font-mono text-xs">{lead.phone || '-'}</td>
+                            <td className="py-2 px-3">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                lead.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                lead.status === 'sent' ? 'bg-green-100 text-green-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {lead.status || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-xs text-gray-500">
+                              {lead.created_at ? new Date(lead.created_at).toLocaleString() : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Campaigns */}
+              {debugData.campaigns && debugData.campaigns.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Recent Campaigns (Last 10)</h4>
+                  <div className="space-y-2">
+                    {debugData.campaigns.map((campaign: any) => (
+                      <div key={campaign.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{campaign.name || 'Unnamed Campaign'}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {campaign.location || 'No location'} • {campaign.keyword || 'No keyword'}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Orphaned Leads */}
+              {debugData.orphanedLeads && debugData.orphanedLeads.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-red-600 mb-3">⚠️ Orphaned Leads (No Campaign)</h4>
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-800 mb-2">
+                      These leads exist but don't have a campaign assigned. This indicates a problem.
+                    </p>
+                    <div className="space-y-1">
+                      {debugData.orphanedLeads.map((lead: any) => (
+                        <div key={lead.id} className="text-sm text-red-700">
+                          • {lead.nome || lead.empresa || 'Unknown'} ({lead.id.substring(0, 8)}...)
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Errors */}
+              {debugData.errors && Object.values(debugData.errors).some((err: any) => err !== null) && (
+                <div>
+                  <h4 className="font-semibold text-red-600 mb-3">Errors</h4>
+                  <div className="space-y-2">
+                    {Object.entries(debugData.errors).map(([key, error]: [string, any]) => {
+                      if (!error) return null;
+                      return (
+                        <div key={key} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="font-medium text-red-800 text-sm">{key}</p>
+                          <p className="text-xs text-red-600 mt-1">{error}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* No Data Message */}
+              {debugData.recentLeadsCount === 0 && debugData.campaignsCount === 0 && (
+                <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                  <p className="text-yellow-800 font-medium">No leads or campaigns found in database</p>
+                  <p className="text-sm text-yellow-600 mt-2">
+                    This could mean:
+                    <br />• No leads have been sent yet
+                    <br />• There's a database connection issue
+                    <br />• Leads are being created in a different table
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowDebugModal(false);
+                  setDebugData(null);
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Close
               </button>
             </div>
           </div>
