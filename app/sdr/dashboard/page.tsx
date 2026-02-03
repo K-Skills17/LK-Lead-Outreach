@@ -22,6 +22,7 @@ import {
   Eye,
   MousePointerClick,
   Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
