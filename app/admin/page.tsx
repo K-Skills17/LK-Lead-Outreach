@@ -2112,6 +2112,169 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+              {/* Lead Gen Tool Data - Reports & Analysis */}
+              {((selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url || (selectedLead as any).personalized_message || (selectedLead as any).dor_especifica) && (
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                      <BarChart3 className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Lead Gen Tool Data</h3>
+                  </div>
+
+                  {/* Business Analysis / Personalized Message */}
+                  {((selectedLead as any).personalized_message || (selectedLead as any).dor_especifica) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">Business Analysis / Pain Point</p>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {(selectedLead as any).personalized_message || (selectedLead as any).dor_especifica}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Report URLs */}
+                  {((selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📄 Reports & Documents</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(selectedLead as any).report_url && (
+                          <a
+                            href={(selectedLead as any).report_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            View Report
+                          </a>
+                        )}
+                        {(selectedLead as any).pdf_url && (
+                          <a
+                            href={(selectedLead as any).pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            📄 PDF Report
+                          </a>
+                        )}
+                        {(selectedLead as any).drive_url && (
+                          <a
+                            href={(selectedLead as any).drive_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            📁 Drive Link
+                          </a>
+                        )}
+                        {(selectedLead as any).mockup_url && (
+                          <a
+                            href={(selectedLead as any).mockup_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            🎨 Mockup
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Business Metrics */}
+                  {((selectedLead as any).business_quality_score || (selectedLead as any).seo_score || (selectedLead as any).page_score || (selectedLead as any).rating || (selectedLead as any).reviews) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📊 Business Metrics</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {(selectedLead as any).business_quality_score !== null && (selectedLead as any).business_quality_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Quality Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).business_quality_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).seo_score !== null && (selectedLead as any).seo_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">SEO Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).seo_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).page_score !== null && (selectedLead as any).page_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Page Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).page_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).rating && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Google Rating</p>
+                            <p className="text-lg font-bold text-gray-900">⭐ {(selectedLead as any).rating}/5</p>
+                            {(selectedLead as any).reviews && (
+                              <p className="text-xs text-gray-500">({(selectedLead as any).reviews} reviews)</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Opportunities */}
+                  {(selectedLead as any).opportunities && Array.isArray((selectedLead as any).opportunities) && (selectedLead as any).opportunities.length > 0 && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">💡 Opportunities</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedLead as any).opportunities.map((opp: string, idx: number) => (
+                          <span key={idx} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                            {opp}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Enrichment Data */}
+                  {((selectedLead as any).all_emails || (selectedLead as any).contact_names || (selectedLead as any).whatsapp_phone || (selectedLead as any).site) && (
+                    <div className="bg-white/80 rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">🔗 Additional Information</p>
+                      <div className="space-y-2 text-sm">
+                        {(selectedLead as any).site && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Website: </span>
+                            <a href={(selectedLead as any).site} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {(selectedLead as any).site}
+                            </a>
+                          </div>
+                        )}
+                        {(selectedLead as any).all_emails && Array.isArray((selectedLead as any).all_emails) && (selectedLead as any).all_emails.length > 0 && (
+                          <div>
+                            <span className="text-gray-600 font-medium">All Emails: </span>
+                            <span className="text-gray-700">{(selectedLead as any).all_emails.join(', ')}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).contact_names && Array.isArray((selectedLead as any).contact_names) && (selectedLead as any).contact_names.length > 0 && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Contact Names: </span>
+                            <span className="text-gray-700">{(selectedLead as any).contact_names.join(', ')}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).whatsapp_phone && (
+                          <div>
+                            <span className="text-gray-600 font-medium">WhatsApp: </span>
+                            <span className="text-gray-700">{(selectedLead as any).whatsapp_phone}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).competitor_count !== null && (selectedLead as any).competitor_count !== undefined && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Competitors Found: </span>
+                            <span className="text-gray-700">{(selectedLead as any).competitor_count}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button

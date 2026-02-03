@@ -29,6 +29,21 @@ export interface GenerateEmailVariationsInput {
   tone?: 'professional' | 'friendly' | 'direct' | 'consultative';
   includeCTA?: boolean;
   ctaText?: string;
+  // Lead Gen Tool Data
+  painPoints?: string[];
+  opportunities?: string[];
+  businessQualityScore?: number;
+  businessQualityTier?: string;
+  seoScore?: number;
+  pageScore?: number;
+  rating?: number;
+  reviews?: number;
+  competitorCount?: number;
+  businessAnalysis?: string;
+  location?: string;
+  allEmails?: string[];
+  contactNames?: string[];
+  enrichmentData?: any;
 }
 
 /**
@@ -42,39 +57,83 @@ export async function generateEmailVariations(
       return { success: false, error: 'OPENAI_API_KEY not configured' };
     }
 
-    const prompt = `You are an expert email copywriter specializing in B2B outreach. Generate 3 distinct email variations for A/B testing.
+    // Build comprehensive lead context from all available data
+    const painPointsList = input.painPoints && input.painPoints.length > 0 
+      ? input.painPoints.join(', ')
+      : input.leadPainPoint || 'Not identified';
+    
+    const opportunitiesList = input.opportunities && input.opportunities.length > 0
+      ? input.opportunities.join(', ')
+      : 'Not identified';
+    
+    const businessMetrics = [];
+    if (input.businessQualityScore !== undefined) businessMetrics.push(`Business Quality Score: ${input.businessQualityScore}/100`);
+    if (input.seoScore !== undefined) businessMetrics.push(`SEO Score: ${input.seoScore}/100`);
+    if (input.pageScore !== undefined) businessMetrics.push(`Page Score: ${input.pageScore}/100`);
+    if (input.rating !== undefined) businessMetrics.push(`Google Rating: ${input.rating}/5${input.reviews ? ` (${input.reviews} reviews)` : ''}`);
+    if (input.competitorCount !== undefined) businessMetrics.push(`Competitors Found: ${input.competitorCount}`);
+    
+    const businessMetricsText = businessMetrics.length > 0 ? businessMetrics.join(' | ') : 'Not available';
+    
+    const locationInfo = input.location ? `Location: ${input.location}` : '';
+    const contactInfo = input.allEmails && input.allEmails.length > 0 
+      ? `Additional Emails: ${input.allEmails.join(', ')}`
+      : '';
+    const contactNamesInfo = input.contactNames && input.contactNames.length > 0
+      ? `Contact Names: ${input.contactNames.join(', ')}`
+      : '';
 
-Lead Information:
+    const prompt = `You are an expert email copywriter specializing in high-converting B2B outreach. Generate 3 distinct, RICH, and highly engaging email variations for A/B testing.
+
+COMPREHENSIVE LEAD INFORMATION:
 - Company: ${input.leadCompany}
 - Contact Name: ${input.leadName || 'Not provided'}
-- Role: ${input.leadRole || 'Not provided'}
-- Pain Point: ${input.leadPainPoint || 'Not provided'}
+- Role/Title: ${input.leadRole || 'Not provided'}
 - Website: ${input.leadWebsite || 'Not provided'}
-- Niche: ${input.niche || 'General business'}
-- Business Context: ${input.businessContext || 'Not provided'}
+- Niche/Industry: ${input.niche || 'General business'}
+${locationInfo ? `- ${locationInfo}` : ''}
+${contactInfo ? `- ${contactInfo}` : ''}
+${contactNamesInfo ? `- ${contactNamesInfo}` : ''}
 
-Requirements:
-1. Create 3 distinct variations with different approaches:
-   - Variation 1: "Direct" - Straightforward, value-focused, clear CTA
-   - Variation 2: "Question" - Opens with a thought-provoking question, consultative approach
-   - Variation 3: "Story" - Uses a brief case study or story, builds connection
+PAIN POINTS IDENTIFIED:
+${painPointsList}
 
-2. Each email should:
-   - Be personalized to the company/contact
-   - Be concise (150-200 words)
-   - Include a clear call-to-action
-   - Use ${input.tone || 'professional'} tone
-   - Be suitable for B2B outreach
+OPPORTUNITIES DISCOVERED:
+${opportunitiesList}
 
-3. Subject lines should be:
-   - Compelling and relevant
-   - Different for each variation
-   - 50 characters or less
+BUSINESS METRICS & ANALYSIS:
+${businessMetricsText}
+${input.businessAnalysis ? `\nBusiness Analysis: ${input.businessAnalysis}` : ''}
+${input.businessContext ? `\nAdditional Context: ${input.businessContext}` : ''}
 
-4. HTML content should be:
-   - Professional email format
-   - Include proper structure (greeting, body, CTA)
+CRITICAL REQUIREMENTS:
+1. Create 3 distinct variations with different psychological approaches:
+   - Variation 1: "Direct" - Lead with the PRIMARY PAIN POINT or most urgent opportunity. Be direct about the problem and solution. Create urgency. Use specific data/metrics discovered.
+   - Variation 2: "Question" - Open with a thought-provoking question based on their pain points or business metrics. Make them think about their current situation. Use curiosity gap.
+   - Variation 3: "Story" - Use a brief, relevant case study or story that relates to their pain points/opportunities. Build emotional connection and show proof.
+
+2. Each email MUST:
+   - Use SPECIFIC data discovered (scores, ratings, competitor count, pain points, opportunities)
+   - Reference their website/company if available to show research
+   - Lead with pain point, curiosity, or opportunity (depending on variation)
+   - Be RICH in content (200-250 words) - not generic or shallow
+   - Create URGENCY or compelling reason to respond NOW
+   - Include a STRONG, specific call-to-action that solicits engagement
+   - Use ${input.tone || 'professional'} tone but be conversational and human
+   - Be optimized to START CONVERSATIONS and get responses
+   - Show you understand their business deeply
+
+3. Subject lines should:
+   - Be compelling and create curiosity or urgency
+   - Reference specific pain point, opportunity, or discovery
+   - Be different for each variation
+   - 50-60 characters maximum
+
+4. HTML content should:
+   - Professional email format with proper structure
+   - Include greeting, rich body with specific details, strong CTA
    - Use simple HTML (no complex styling)
+   - Be engaging and scannable
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -104,19 +163,19 @@ Return ONLY a valid JSON object with this exact structure:
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are an expert email copywriter. Always return valid JSON only, no additional text.',
+          content: 'You are an expert email copywriter specializing in high-converting B2B outreach. Always return valid JSON only, no additional text. Make emails rich, specific, and engaging.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.8,
-      max_tokens: 2000,
+      temperature: 0.85,
+      max_tokens: 3000, // Increased for richer content (200-250 words per email x 3)
     });
 
     const responseText = completion.choices[0]?.message?.content;

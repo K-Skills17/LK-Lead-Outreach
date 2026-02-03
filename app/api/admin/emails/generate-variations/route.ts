@@ -33,10 +33,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = generateVariationsSchema.parse(body);
 
-    // Get contact details
+    // Get contact details with ALL lead gen tool data
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
-      .select('id, nome, empresa, cargo, email, dor_especifica, site, niche, enrichment_data')
+      .select(`
+        id, nome, empresa, cargo, email, dor_especifica, site, niche, location, city, state, country,
+        pain_points, opportunities, 
+        business_quality_score, business_quality_tier, seo_score, page_score,
+        rating, reviews, competitor_count,
+        all_emails, contact_names, whatsapp_phone,
+        personalized_message, enrichment_data
+      `)
       .eq('id', validated.contactId)
       .maybeSingle();
 
@@ -52,18 +59,68 @@ export async function POST(request: NextRequest) {
     const leadInfo = enrichmentData?.lead || {};
     const analysisData = enrichmentData?.analysis || {};
 
-    // Generate variations
+    // Extract pain points (can be array or object)
+    let painPoints: string[] = [];
+    if (contact.pain_points) {
+      if (Array.isArray(contact.pain_points)) {
+        painPoints = contact.pain_points;
+      } else if (typeof contact.pain_points === 'object') {
+        painPoints = Object.entries(contact.pain_points)
+          .filter(([_, value]) => value === true || value === 'true')
+          .map(([key, _]) => key);
+      }
+    }
+    // Fallback to dor_especifica or analysis data
+    if (painPoints.length === 0) {
+      if (contact.dor_especifica) painPoints = [contact.dor_especifica];
+      else if (analysisData?.pain_points && Array.isArray(analysisData.pain_points)) {
+        painPoints = analysisData.pain_points;
+      }
+    }
+
+    // Extract opportunities
+    let opportunities: string[] = [];
+    if (contact.opportunities) {
+      if (Array.isArray(contact.opportunities)) {
+        opportunities = contact.opportunities;
+      } else if (typeof contact.opportunities === 'object') {
+        opportunities = Object.entries(contact.opportunities)
+          .filter(([_, value]) => value === true || value === 'true')
+          .map(([key, _]) => key);
+      }
+    }
+
+    // Build location string
+    const locationParts = [contact.city, contact.state, contact.country].filter(Boolean);
+    const location = locationParts.length > 0 ? locationParts.join(', ') : contact.location || undefined;
+
+    // Generate variations with ALL lead gen tool data
     const result = await generateEmailVariations({
       leadName: contact.nome || undefined,
       leadCompany: contact.empresa,
       leadRole: contact.cargo || undefined,
-      leadPainPoint: contact.dor_especifica || analysisData?.pain_points?.[0] || undefined,
+      leadPainPoint: painPoints.length > 0 ? painPoints[0] : contact.dor_especifica || undefined,
       leadWebsite: contact.site || leadInfo?.website || undefined,
-      businessContext: analysisData?.business_analysis || undefined,
+      businessContext: contact.personalized_message || analysisData?.business_analysis || undefined,
       niche: contact.niche || undefined,
       tone: validated.tone || 'professional',
       includeCTA: validated.includeCTA !== false,
       ctaText: validated.ctaText,
+      // Lead Gen Tool Data
+      painPoints: painPoints.length > 0 ? painPoints : undefined,
+      opportunities: opportunities.length > 0 ? opportunities : undefined,
+      businessQualityScore: contact.business_quality_score || undefined,
+      businessQualityTier: contact.business_quality_tier || undefined,
+      seoScore: contact.seo_score || undefined,
+      pageScore: contact.page_score || undefined,
+      rating: contact.rating || undefined,
+      reviews: contact.reviews || undefined,
+      competitorCount: contact.competitor_count || undefined,
+      businessAnalysis: contact.personalized_message || analysisData?.business_analysis || undefined,
+      location: location,
+      allEmails: contact.all_emails && Array.isArray(contact.all_emails) ? contact.all_emails : undefined,
+      contactNames: contact.contact_names && Array.isArray(contact.contact_names) ? contact.contact_names : undefined,
+      enrichmentData: enrichmentData,
     });
 
     if (!result.success || !result.variations) {

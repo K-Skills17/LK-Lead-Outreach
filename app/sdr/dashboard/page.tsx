@@ -27,6 +27,7 @@ import {
   Pause,
   Square,
   Send,
+  BarChart3,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -118,6 +119,8 @@ export default function SDRDashboardPage() {
   const [sendingState, setSendingState] = useState<any>(null);
   const [queueStatus, setQueueStatus] = useState<any>(null);
   const [loadingSending, setLoadingSending] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showLeadDetail, setShowLeadDetail] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -832,7 +835,11 @@ export default function SDRDashboardPage() {
                     {leads.map((lead) => (
                       <div
                         key={lead.id}
-                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setShowLeadDetail(true);
+                        }}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -879,7 +886,7 @@ export default function SDRDashboardPage() {
                               {formatDate(lead.created_at)}
                             </p>
                             {lead.phone && (
-                              <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => {
                                     setWhatsappLead(lead);
@@ -897,7 +904,8 @@ export default function SDRDashboardPage() {
                                 </button>
                                 {((lead as any).analysis_image_url || (lead as any).landing_page_url) && (
                                   <button
-                                    onClick={async () => {
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
                                       if (!confirm(`Send photo/image to ${lead.nome} via WhatsApp?`)) return;
                                       
                                       const userData = localStorage.getItem('sdr_user');
@@ -1443,6 +1451,306 @@ export default function SDRDashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Lead Detail Modal */}
+      {showLeadDetail && selectedLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowLeadDetail(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-gradient-to-r from-green-600 to-blue-600 p-6 text-white rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedLead.nome}</h2>
+                  <p className="text-green-100 mt-1">{selectedLead.empresa}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowLeadDetail(false);
+                    setSelectedLead(null);
+                  }}
+                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Phone</p>
+                  <p className="font-semibold text-gray-900">{selectedLead.phone}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Status</p>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    selectedLead.status === 'sent' ? 'bg-green-100 text-green-700' :
+                    selectedLead.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {selectedLead.status}
+                  </span>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Campaign</p>
+                  <p className="font-semibold text-gray-900">{selectedLead.campaigns?.name || '-'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Created</p>
+                  <p className="font-semibold text-gray-900">{formatDate(selectedLead.created_at)}</p>
+                </div>
+              </div>
+
+              {/* Lead Gen Tool Data - Reports & Analysis */}
+              {((selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url || (selectedLead as any).personalized_message || (selectedLead as any).dor_especifica) && (
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                      <BarChart3 className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Lead Gen Tool Data</h3>
+                  </div>
+
+                  {/* Business Analysis / Personalized Message */}
+                  {((selectedLead as any).personalized_message || (selectedLead as any).dor_especifica) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">Business Analysis / Pain Point</p>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {(selectedLead as any).personalized_message || (selectedLead as any).dor_especifica}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Report URLs */}
+                  {((selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📄 Reports & Documents</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(selectedLead as any).report_url && (
+                          <a
+                            href={(selectedLead as any).report_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            View Report
+                          </a>
+                        )}
+                        {(selectedLead as any).pdf_url && (
+                          <a
+                            href={(selectedLead as any).pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            📄 PDF Report
+                          </a>
+                        )}
+                        {(selectedLead as any).drive_url && (
+                          <a
+                            href={(selectedLead as any).drive_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            📁 Drive Link
+                          </a>
+                        )}
+                        {(selectedLead as any).mockup_url && (
+                          <a
+                            href={(selectedLead as any).mockup_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            🎨 Mockup
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Business Metrics */}
+                  {((selectedLead as any).business_quality_score || (selectedLead as any).seo_score || (selectedLead as any).page_score || (selectedLead as any).rating || (selectedLead as any).reviews) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📊 Business Metrics</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {(selectedLead as any).business_quality_score !== null && (selectedLead as any).business_quality_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Quality Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).business_quality_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).seo_score !== null && (selectedLead as any).seo_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">SEO Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).seo_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).page_score !== null && (selectedLead as any).page_score !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Page Score</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).page_score}/100</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).rating && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Google Rating</p>
+                            <p className="text-lg font-bold text-gray-900">⭐ {(selectedLead as any).rating}/5</p>
+                            {(selectedLead as any).reviews && (
+                              <p className="text-xs text-gray-500">({(selectedLead as any).reviews} reviews)</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Opportunities */}
+                  {(selectedLead as any).opportunities && Array.isArray((selectedLead as any).opportunities) && (selectedLead as any).opportunities.length > 0 && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-2 font-semibold">💡 Opportunities</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedLead as any).opportunities.map((opp: string, idx: number) => (
+                          <span key={idx} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                            {opp}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Enrichment Data */}
+                  {((selectedLead as any).all_emails || (selectedLead as any).contact_names || (selectedLead as any).whatsapp_phone || (selectedLead as any).site) && (
+                    <div className="bg-white/80 rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">🔗 Additional Information</p>
+                      <div className="space-y-2 text-sm">
+                        {(selectedLead as any).site && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Website: </span>
+                            <a href={(selectedLead as any).site} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {(selectedLead as any).site}
+                            </a>
+                          </div>
+                        )}
+                        {(selectedLead as any).all_emails && Array.isArray((selectedLead as any).all_emails) && (selectedLead as any).all_emails.length > 0 && (
+                          <div>
+                            <span className="text-gray-600 font-medium">All Emails: </span>
+                            <span className="text-gray-700">{(selectedLead as any).all_emails.join(', ')}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).contact_names && Array.isArray((selectedLead as any).contact_names) && (selectedLead as any).contact_names.length > 0 && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Contact Names: </span>
+                            <span className="text-gray-700">{(selectedLead as any).contact_names.join(', ')}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).whatsapp_phone && (
+                          <div>
+                            <span className="text-gray-600 font-medium">WhatsApp: </span>
+                            <span className="text-gray-700">{(selectedLead as any).whatsapp_phone}</span>
+                          </div>
+                        )}
+                        {(selectedLead as any).competitor_count !== null && (selectedLead as any).competitor_count !== undefined && (
+                          <div>
+                            <span className="text-gray-600 font-medium">Competitors Found: </span>
+                            <span className="text-gray-700">{(selectedLead as any).competitor_count}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Visual Assets */}
+              {((selectedLead as any).analysis_image_url || (selectedLead as any).landing_page_url) && (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Visual Assets</h3>
+                  </div>
+                  
+                  {(selectedLead as any).analysis_image_url && (
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">📊 Analysis Image</p>
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <img 
+                          src={(selectedLead as any).analysis_image_url} 
+                          alt={`Analysis - ${selectedLead.empresa || selectedLead.nome}`}
+                          className="w-full h-auto rounded-lg mb-3 max-h-96 object-contain"
+                        />
+                        <a
+                          href={(selectedLead as any).analysis_image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center text-sm font-medium"
+                        >
+                          Ver Imagem Completa
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedLead as any).landing_page_url && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2">🎨 Landing Page Mockup</p>
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <img 
+                          src={(selectedLead as any).landing_page_url} 
+                          alt={`Landing Page - ${selectedLead.empresa || selectedLead.nome}`}
+                          className="w-full h-auto rounded-lg mb-3 max-h-96 object-contain"
+                        />
+                        <a
+                          href={(selectedLead as any).landing_page_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center text-sm font-medium"
+                        >
+                          Ver Landing Page Completa
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                {selectedLead.phone && (
+                  <button
+                    onClick={() => {
+                      setShowLeadDetail(false);
+                      setWhatsappLead(selectedLead);
+                      const defaultMessage = (selectedLead as any).personalized_message || 
+                        `Olá ${selectedLead.nome || 'Cliente'}! 👋\n\nVi que você trabalha na ${selectedLead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\n${user?.name || 'Equipe LK Digital'}`;
+                      setWhatsappMessage(defaultMessage);
+                      setIncludeImagesInWhatsApp(true);
+                      setShowWhatsAppModal(true);
+                    }}
+                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                    Send WhatsApp
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowLeadDetail(false);
+                    setSelectedLead(null);
+                  }}
+                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manual Landing Page URL Modal */}
       {showManualUrlModal && manualUrlLead && (
