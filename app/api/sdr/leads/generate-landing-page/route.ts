@@ -51,16 +51,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
+    // Type assertion for contact with all needed properties
+    const contactData = contact as any;
+
     // Verify SDR has access to this lead
-    if (contact.assigned_sdr_id !== sdr.id) {
+    if (contactData.assigned_sdr_id !== sdr.id) {
       return NextResponse.json(
         { error: 'You do not have access to this lead' },
         { status: 403 }
       );
     }
-
-    // Type assertion for contact with all needed properties
-    const contactData = contact as any;
 
     // If manual URL provided, just save it
     if (validated.manualUrl) {
