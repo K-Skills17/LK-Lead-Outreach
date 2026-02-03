@@ -105,6 +105,11 @@ export default function SDRDashboardPage() {
   const [showManualUrlModal, setShowManualUrlModal] = useState(false);
   const [manualUrlLead, setManualUrlLead] = useState<Lead | null>(null);
   const [manualUrl, setManualUrl] = useState('');
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [includeImagesInWhatsApp, setIncludeImagesInWhatsApp] = useState(true);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -757,49 +762,14 @@ export default function SDRDashboardPage() {
                             {lead.status === 'pending' && lead.phone && (
                               <div className="flex flex-col gap-2">
                                 <button
-                                  onClick={async () => {
-                                    if (!confirm(`Send WhatsApp message to ${lead.nome}?`)) return;
-                                    
-                                    const userData = localStorage.getItem('sdr_user');
-                                    if (!userData) {
-                                      alert('❌ Authentication required');
-                                      router.push('/sdr/login');
-                                      return;
-                                    }
-                                    
-                                    const currentUser = JSON.parse(userData);
-                                    const sdrId = currentUser.id;
-                                    
-                                    try {
-                                      const response = await fetch('/api/whatsapp/send', {
-                                        method: 'POST',
-                                        headers: {
-                                          'Authorization': `Bearer ${sdrId}`,
-                                          'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                          contactId: lead.id,
-                                          skipChecks: true, // Allow manual send
-                                          includeImages: true, // Include images
-                                        }),
-                                      });
-                                      
-                                      const result = await response.json();
-                                      
-                                      if (response.ok && result.success) {
-                                        alert('✅ WhatsApp message sent!');
-                                        // Reload dashboard
-                                        const token = sdrToken || localStorage.getItem('sdr_token');
-                                        if (token) {
-                                          loadDashboardData(token);
-                                        }
-                                      } else {
-                                        alert(`❌ ${result.error || result.reason || 'Failed to send message'}`);
-                                      }
-                                    } catch (err) {
-                                      alert('❌ Failed to send WhatsApp message');
-                                      console.error(err);
-                                    }
+                                  onClick={() => {
+                                    setWhatsappLead(lead);
+                                    // Pre-fill with personalized message if available, or default
+                                    const defaultMessage = (lead as any).personalized_message || 
+                                      `Olá ${lead.nome || 'Cliente'}! 👋\n\nVi que você trabalha na ${lead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\n${user?.name || 'Equipe LK Digital'}`;
+                                    setWhatsappMessage(defaultMessage);
+                                    setIncludeImagesInWhatsApp(true);
+                                    setShowWhatsAppModal(true);
                                   }}
                                   className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 font-medium flex items-center gap-1.5"
                                 >

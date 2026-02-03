@@ -151,6 +151,11 @@ export default function AdminDashboard() {
   const [leadsToDelete, setLeadsToDelete] = useState<string[]>([]);
   const [generatingImage, setGeneratingImage] = useState<string | null>(null); // contactId being generated
   const [generatingLandingPage, setGeneratingLandingPage] = useState<string | null>(null); // contactId being generated
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [includeImagesInWhatsApp, setIncludeImagesInWhatsApp] = useState(true);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
