@@ -99,6 +99,10 @@ export default function SDRDashboardPage() {
   } | null>(null);
   const [connectingWhatsapp, setConnectingWhatsapp] = useState(false);
   const [sdrToken, setSdrToken] = useState<string | null>(null);
+  const [generatingLandingPage, setGeneratingLandingPage] = useState<string | null>(null);
+  const [showManualUrlModal, setShowManualUrlModal] = useState(false);
+  const [manualUrlLead, setManualUrlLead] = useState<Lead | null>(null);
+  const [manualUrl, setManualUrl] = useState('');
 
   useEffect(() => {
     // Check authentication
@@ -1108,6 +1112,114 @@ export default function SDRDashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Manual Landing Page URL Modal */}
+      {showManualUrlModal && manualUrlLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                {manualUrlLead.landing_page_url ? 'Edit' : 'Add'} Landing Page URL
+              </h3>
+              <button
+                onClick={() => {
+                  setShowManualUrlModal(false);
+                  setManualUrlLead(null);
+                  setManualUrl('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Lead: <strong>{manualUrlLead.nome}</strong> ({manualUrlLead.empresa})
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Landing Page URL
+              </label>
+              <input
+                type="url"
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder="https://example.com/landing-page"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter a direct URL to the landing page image or mockup
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  if (!manualUrl.trim()) {
+                    alert('Please enter a valid URL');
+                    return;
+                  }
+
+                  try {
+                    const userData = localStorage.getItem('sdr_user');
+                    if (!userData) {
+                      alert('❌ Authentication required');
+                      return;
+                    }
+
+                    const currentUser = JSON.parse(userData);
+                    const sdrId = currentUser.id;
+
+                    const response = await fetch('/api/sdr/leads/generate-landing-page', {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${sdrId}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        contactId: manualUrlLead.id,
+                        manualUrl: manualUrl.trim(),
+                      }),
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                      alert('✅ Landing page URL saved successfully!');
+                      setShowManualUrlModal(false);
+                      setManualUrlLead(null);
+                      setManualUrl('');
+                      // Reload dashboard
+                      const token = sdrToken || localStorage.getItem('sdr_token');
+                      if (token) {
+                        loadDashboardData(token);
+                      }
+                    } else {
+                      alert(`❌ ${result.error || 'Failed to save URL'}`);
+                    }
+                  } catch (err) {
+                    alert('❌ Failed to save landing page URL');
+                    console.error(err);
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowManualUrlModal(false);
+                  setManualUrlLead(null);
+                  setManualUrl('');
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
