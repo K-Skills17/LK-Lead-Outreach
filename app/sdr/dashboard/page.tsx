@@ -57,6 +57,7 @@ interface Lead {
   status: string;
   created_at: string;
   landing_page_url?: string;
+  analysis_image_url?: string;
   campaigns?: {
     id: string;
     name: string;
@@ -759,7 +760,7 @@ export default function SDRDashboardPage() {
                             <p className="text-xs text-gray-500 mb-2">
                               {formatDate(lead.created_at)}
                             </p>
-                            {lead.status === 'pending' && lead.phone && (
+                            {lead.phone && (
                               <div className="flex flex-col gap-2">
                                 <button
                                   onClick={() => {
