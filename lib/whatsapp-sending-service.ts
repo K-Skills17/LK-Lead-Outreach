@@ -33,6 +33,7 @@ export interface WhatsAppSendOptions {
   messageText: string;
   settings?: HumanBehaviorSettings;
   skipChecks?: boolean; // For manual sends
+  includeImages?: boolean; // Include analysis images and landing pages in message
 }
 
 /**
