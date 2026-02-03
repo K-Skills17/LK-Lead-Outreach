@@ -23,6 +23,10 @@ import {
   MousePointerClick,
   Image as ImageIcon,
   X,
+  Play,
+  Pause,
+  Square,
+  Send,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -89,7 +93,7 @@ export default function SDRDashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies' | 'emails' | 'whatsapp'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'replies' | 'emails' | 'whatsapp' | 'sending'>('overview');
   const [emails, setEmails] = useState<any[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [whatsappSends, setWhatsappSends] = useState<any[]>([]);
@@ -111,6 +115,9 @@ export default function SDRDashboardPage() {
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [includeImagesInWhatsApp, setIncludeImagesInWhatsApp] = useState(true);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [sendingState, setSendingState] = useState<any>(null);
+  const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [loadingSending, setLoadingSending] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -128,6 +135,18 @@ export default function SDRDashboardPage() {
     loadWhatsappStatus(token);
     loadEmails(token);
     loadWhatsappSends(token);
+    loadSendingControl(token);
+    loadQueueStatus(token);
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(() => {
+      if (token) {
+        loadSendingControl(token);
+        loadQueueStatus(token);
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, [router]);
 
   const loadDashboardData = async (token: string) => {
@@ -354,6 +373,88 @@ export default function SDRDashboardPage() {
       console.error('Error loading WhatsApp sends:', err);
     } finally {
       setLoadingWhatsappSends(false);
+    }
+  };
+
+  const loadSendingControl = async (token: string) => {
+    try {
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/sending/control', {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSendingState(result);
+      }
+    } catch (err) {
+      console.error('Error loading sending control:', err);
+    }
+  };
+
+  const loadQueueStatus = async (token: string) => {
+    try {
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) return;
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/sending/queue', {
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setQueueStatus(result);
+      }
+    } catch (err) {
+      console.error('Error loading queue status:', err);
+    }
+  };
+
+  const handleSendingAction = async (action: 'start' | 'stop' | 'pause' | 'resume') => {
+    try {
+      setLoadingSending(true);
+      const userData = localStorage.getItem('sdr_user');
+      if (!userData) {
+        alert('❌ Authentication required');
+        return;
+      }
+
+      const currentUser = JSON.parse(userData);
+      const sdrId = currentUser.id;
+
+      const response = await fetch('/api/sdr/sending/control', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sdrId}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (response.ok) {
+        await loadSendingControl(sdrId);
+        await loadQueueStatus(sdrId);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to perform action');
+      }
+    } catch (err) {
+      console.error('Error performing sending action:', err);
+      alert('Failed to perform action');
+    } finally {
+      setLoadingSending(false);
     }
   };
 
@@ -621,6 +722,23 @@ export default function SDRDashboardPage() {
                 }`}
               >
                 WhatsApp ({whatsappSends.length})
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('sending');
+                  const token = localStorage.getItem('sdr_token');
+                  if (token) {
+                    loadSendingControl(token);
+                    loadQueueStatus(token);
+                  }
+                }}
+                className={`px-4 py-3 font-semibold text-sm transition-colors relative ${
+                  activeTab === 'sending'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Sending Control
               </button>
             </div>
           </div>
@@ -1080,6 +1198,246 @@ export default function SDRDashboardPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Sending Control Tab */}
+            {activeTab === 'sending' && (
+              <div className="space-y-6">
+                {/* Control Panel */}
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl shadow-xl border border-green-200/50 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">WhatsApp Sending Control</h3>
+                      <p className="text-sm text-gray-600">Manage automated WhatsApp sending for your assigned leads</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {sendingState?.isRunning ? (
+                        <>
+                          {sendingState.isPaused ? (
+                            <button
+                              onClick={() => handleSendingAction('resume')}
+                              disabled={loadingSending}
+                              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                            >
+                              <Play className="w-5 h-5" />
+                              {loadingSending ? 'Resuming...' : 'Resume'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSendingAction('pause')}
+                              disabled={loadingSending}
+                              className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                            >
+                              <Pause className="w-5 h-5" />
+                              {loadingSending ? 'Pausing...' : 'Pause'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleSendingAction('stop')}
+                            disabled={loadingSending}
+                            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                          >
+                            <Square className="w-5 h-5" />
+                            {loadingSending ? 'Stopping...' : 'Stop'}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleSendingAction('start')}
+                          disabled={loadingSending}
+                          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-semibold disabled:opacity-50"
+                        >
+                          <Play className="w-5 h-5" />
+                          {loadingSending ? 'Starting...' : 'Start Sending'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status Display */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          sendingState?.isRunning
+                            ? sendingState.isPaused
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {sendingState?.isRunning
+                            ? sendingState.isPaused
+                              ? '⏸ Paused'
+                              : '▶ Running'
+                            : '⏹ Stopped'}
+                        </span>
+                      </div>
+                      {sendingState?.sessionStartedAt && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Started: {formatDate(sendingState.sessionStartedAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Today</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {sendingState?.messagesSentToday || 0}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Limit: {queueStatus?.dailyLimit || 250}
+                      </p>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">This Session</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {sendingState?.messagesSentSession || 0}
+                        </span>
+                      </div>
+                      {sendingState?.lastMessageSentAt && (
+                        <p className="text-xs text-gray-500">
+                          Last: {formatDate(sendingState.lastMessageSentAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Queue Status */}
+                  {queueStatus && (
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <h4 className="font-semibold text-gray-900 mb-3">Queue Status</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Ready to Send</p>
+                          <p className="text-2xl font-bold text-green-600">{queueStatus.readyToSend || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Total Pending</p>
+                          <p className="text-2xl font-bold text-gray-900">{queueStatus.totalPending || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Remaining Today</p>
+                          <p className="text-2xl font-bold text-blue-600">{queueStatus.remainingDaily || 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Skipped</p>
+                          <p className="text-lg font-semibold text-orange-600">
+                            {queueStatus.skipped?.tooRecent || 0} recent, {queueStatus.skipped?.weekend || 0} weekend
+                          </p>
+                        </div>
+                      </div>
+                      {queueStatus.isWeekend && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            ⚠️ Weekend detected - Sending is paused until Monday
+                          </p>
+                        </div>
+                      )}
+                      {queueStatus.isWorkingHours === false && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800">
+                            ⏰ Outside working hours - Sending will resume at {queueStatus.controlState?.pausedUntil ? formatDate(queueStatus.controlState.pausedUntil) : '10:00'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Trigger Section */}
+                <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Manual Trigger</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoadingSending(true);
+                          const userData = localStorage.getItem('sdr_user');
+                          if (!userData) {
+                            alert('❌ Authentication required');
+                            return;
+                          }
+
+                          const currentUser = JSON.parse(userData);
+                          const sdrId = currentUser.id;
+
+                          const response = await fetch('/api/outreach/process', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${sdrId}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ maxMessages: 10, sdrId }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            alert(`Processed ${result.processed} messages. ${result.skipped} skipped.`);
+                            await loadQueueStatus(sdrId);
+                            await loadSendingControl(sdrId);
+                          } else {
+                            alert(result.error || 'Failed to process');
+                          }
+                        } catch (err) {
+                          alert('Failed to trigger sending');
+                        } finally {
+                          setLoadingSending(false);
+                        }
+                      }}
+                      disabled={loadingSending}
+                      className="px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                    >
+                      <Send className="w-5 h-5" />
+                      {loadingSending ? 'Processing...' : 'Process Queue Now (10 messages)'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoadingSending(true);
+                          const userData = localStorage.getItem('sdr_user');
+                          if (!userData) {
+                            alert('❌ Authentication required');
+                            return;
+                          }
+
+                          const currentUser = JSON.parse(userData);
+                          const sdrId = currentUser.id;
+
+                          const response = await fetch('/api/outreach/process', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${sdrId}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ maxMessages: 50, sdrId }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            alert(`Processed ${result.processed} messages. ${result.skipped} skipped.`);
+                            await loadQueueStatus(sdrId);
+                            await loadSendingControl(sdrId);
+                          } else {
+                            alert(result.error || 'Failed to process');
+                          }
+                        } catch (err) {
+                          alert('Failed to trigger sending');
+                        } finally {
+                          setLoadingSending(false);
+                        }
+                      }}
+                      disabled={loadingSending}
+                      className="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+                    >
+                      <Send className="w-5 h-5" />
+                      {loadingSending ? 'Processing...' : 'Process Queue Now (50 messages)'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
