@@ -48,12 +48,13 @@ export async function sendWhatsAppMessage(
       messageText,
       settings = DEFAULT_HUMAN_BEHAVIOR_SETTINGS,
       skipChecks = false,
+      includeImages = true,
     } = options;
 
-    // Get contact details
+    // Get contact details (including image URLs)
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
-      .select('id, nome, empresa, phone, email, assigned_sdr_id, campaign_id, status, personalized_message')
+      .select('id, nome, empresa, phone, email, assigned_sdr_id, campaign_id, status, personalized_message, analysis_image_url, landing_page_url, report_url')
       .eq('id', contactId)
       .single();
 
@@ -123,7 +124,25 @@ export async function sendWhatsAppMessage(
     }
 
     // Use personalized message if available, otherwise use provided message
-    const finalMessage = contact.personalized_message || messageText;
+    let finalMessage = contact.personalized_message || messageText;
+    
+    // Append image URLs to message if available and includeImages is true
+    if (includeImages) {
+      const imageLinks: string[] = [];
+      if ((contact as any).analysis_image_url) {
+        imageLinks.push(`📊 Análise Visual: ${(contact as any).analysis_image_url}`);
+      }
+      if ((contact as any).landing_page_url) {
+        imageLinks.push(`🎨 Landing Page: ${(contact as any).landing_page_url}`);
+      }
+      if ((contact as any).report_url && !(contact as any).analysis_image_url && !(contact as any).landing_page_url) {
+        imageLinks.push(`📄 Relatório: ${(contact as any).report_url}`);
+      }
+      
+      if (imageLinks.length > 0) {
+        finalMessage = `${finalMessage}\n\n${imageLinks.join('\n')}`;
+      }
+    }
 
     // Create WhatsApp send record
     const { data: whatsappSend, error: insertError } = await supabaseAdmin

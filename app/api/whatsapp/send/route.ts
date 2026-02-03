@@ -21,6 +21,7 @@ const sendWhatsAppSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
   messageText: z.string().optional(), // Optional - will use personalized_message if available
   skipChecks: z.boolean().optional().default(false), // For manual sends
+  includeImages: z.boolean().optional().default(true), // Include analysis images and landing pages in message
 });
 
 /**
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       sdrId,
       messageText: validated.messageText || '',
       skipChecks: validated.skipChecks || isAdmin, // Admin can skip checks for manual sends
+      includeImages: validated.includeImages !== false, // Include images by default
     });
 
     if (!result.success) {

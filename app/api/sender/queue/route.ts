@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     // Get current time for scheduled send filtering
     const now = new Date();
 
-    // Build query - fetch pending leads with scheduled_send_at
+    // Build query - fetch pending leads with scheduled_send_at (including image URLs)
     // We'll filter scheduled sends in JavaScript to handle null values properly
     let query = supabaseAdmin
       .from('campaign_contacts')
@@ -91,7 +91,10 @@ export async function GET(request: NextRequest) {
         personalized_message,
         status,
         campaign_id,
-        scheduled_send_at
+        scheduled_send_at,
+        analysis_image_url,
+        landing_page_url,
+        report_url
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })

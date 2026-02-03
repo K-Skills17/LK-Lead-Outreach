@@ -1994,6 +1994,92 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+              {/* Analysis Image */}
+              {((selectedLead as any).analysis_image_url || (selectedLead as any).landing_page_url) && (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Visual Assets</h3>
+                  </div>
+                  
+                  {(selectedLead as any).analysis_image_url && (
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">📊 Analysis Image</p>
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <img 
+                          src={(selectedLead as any).analysis_image_url} 
+                          alt={`Analysis - ${selectedLead.empresa || selectedLead.nome}`}
+                          className="w-full h-auto rounded-lg mb-3 max-h-96 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden text-sm text-red-600">Failed to load image</div>
+                        <div className="flex gap-2">
+                          <a
+                            href={(selectedLead as any).analysis_image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center text-sm font-medium"
+                          >
+                            Ver Imagem Completa
+                          </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText((selectedLead as any).analysis_image_url);
+                              alert('Link copiado!');
+                            }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                          >
+                            Copiar Link
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedLead as any).landing_page_url && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2">🎨 Landing Page Mockup</p>
+                      <div className="bg-white rounded-xl p-4 border border-gray-200">
+                        <img 
+                          src={(selectedLead as any).landing_page_url} 
+                          alt={`Landing Page - ${selectedLead.empresa || selectedLead.nome}`}
+                          className="w-full h-auto rounded-lg mb-3 max-h-96 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden text-sm text-red-600">Failed to load image</div>
+                        <div className="flex gap-2">
+                          <a
+                            href={(selectedLead as any).landing_page_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-center text-sm font-medium"
+                          >
+                            Ver Landing Page Completa
+                          </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText((selectedLead as any).landing_page_url);
+                              alert('Link copiado!');
+                            }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+                          >
+                            Copiar Link
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button

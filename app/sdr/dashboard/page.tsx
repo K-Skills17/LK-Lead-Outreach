@@ -742,9 +742,47 @@ export default function SDRDashboardPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 mb-2">
                               {formatDate(lead.created_at)}
                             </p>
+                            {lead.status === 'pending' && lead.phone && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Send WhatsApp message to ${lead.nome}?`)) return;
+                                  
+                                  try {
+                                    const response = await fetch('/api/whatsapp/send', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        contactId: lead.id,
+                                        skipChecks: true, // Allow manual send
+                                      }),
+                                    });
+                                    
+                                    const result = await response.json();
+                                    
+                                    if (response.ok && result.success) {
+                                      alert('✅ WhatsApp message sent!');
+                                      // Reload dashboard
+                                      loadDashboard(token);
+                                    } else {
+                                      alert(`❌ ${result.error || result.reason || 'Failed to send message'}`);
+                                    }
+                                  } catch (err) {
+                                    alert('❌ Failed to send WhatsApp message');
+                                    console.error(err);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 font-medium flex items-center gap-1.5"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                Send WhatsApp
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

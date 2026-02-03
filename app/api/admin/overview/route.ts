@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       console.error('[Admin Overview] Error fetching campaigns:', campaignsError);
     }
 
-    // Get all leads with SDR assignment info and AI analysis
+    // Get all leads with SDR assignment info and AI analysis (including image URLs)
     const { data: leads, error: leadsError } = await supabaseAdmin
       .from('campaign_contacts')
       .select(`
@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false });
+    
+    // Note: The * selector includes all columns including analysis_image_url and landing_page_url
 
     // Fetch AI analysis data for all leads
     const leadIds = (leads || []).map((l: any) => l.id);
