@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin } from './supabaseAdmin';
+import { getCompleteLeadGenData, mergeLeadGenDataIntoContact } from './lead-gen-db-service';
 import { hashPassword, verifyPassword } from './auth';
 
 export interface SDRUser {
@@ -243,10 +244,46 @@ export async function getSDRLeads(sdrId: string, status?: string) {
       }
 
       // Add email sent time to each lead
-      return leads.map((lead: any) => ({
+      let enrichedLeads = leads.map((lead: any) => ({
         ...lead,
         lastEmailSentAt: emailSentTimes[lead.id] || null,
       }));
+
+      // Enrich with Lead Gen Tool data for leads that have lead_gen_id or missing data
+      const leadsToEnrich = enrichedLeads.filter((lead: any) => {
+        const hasLeadGenId = lead.lead_gen_id;
+        const hasMissingData = !lead.email || !lead.site || !lead.personalized_message || 
+          (!lead.seo_score && !lead.page_score);
+        return hasLeadGenId || hasMissingData;
+      });
+
+      if (leadsToEnrich.length > 0) {
+        // Process in parallel but limit concurrency
+        const enrichmentPromises = leadsToEnrich.slice(0, 10).map(async (lead: any) => {
+          try {
+            const leadGenId = lead.lead_gen_id || lead.id;
+            const leadGenData = await getCompleteLeadGenData(leadGenId);
+            
+            if (leadGenData && leadGenData.lead) {
+              return mergeLeadGenDataIntoContact(lead, leadGenData);
+            }
+            return lead;
+          } catch (error) {
+            console.error(`[SDR] Error enriching lead ${lead.id}:`, error);
+            return lead;
+          }
+        });
+
+        const enrichedResults = await Promise.all(enrichmentPromises);
+        
+        // Update the enriched leads array
+        enrichedLeads = enrichedLeads.map((lead: any) => {
+          const enriched = enrichedResults.find((e: any) => e.id === lead.id);
+          return enriched || lead;
+        });
+      }
+
+      return enrichedLeads;
     }
 
     return leads;

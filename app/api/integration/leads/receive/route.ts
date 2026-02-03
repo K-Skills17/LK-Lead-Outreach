@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendEmail } from '@/lib/email-service-simple';
 import { normalizePhone } from '@/lib/phone';
+import { getCompleteLeadGenData, mergeLeadGenDataIntoContact, getLeadGenLeadByPhone } from '@/lib/lead-gen-db-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -820,6 +821,58 @@ export async function POST(request: NextRequest) {
           results.created++;
           console.log(`[Integration] ✅ Created lead ${leadId} for ${leadName} in campaign ${campaignId}`);
           results.lead_ids.push(leadId);
+        }
+
+        // Fallback: If data seems incomplete, try to fetch from Lead Gen Tool tables
+        try {
+          const { data: savedContact } = await supabaseAdmin
+            .from('campaign_contacts')
+            .select('*')
+            .eq('id', leadId)
+            .single();
+          
+          if (savedContact) {
+            // Check if critical data is missing
+            const hasMissingData = !savedContact.email || 
+              !savedContact.site || 
+              !savedContact.personalized_message ||
+              !savedContact.report_url ||
+              (!savedContact.seo_score && !savedContact.page_score);
+            
+            if (hasMissingData) {
+              console.log(`[Integration] Missing data detected for lead ${leadId}, fetching from Lead Gen Tool tables...`);
+              
+              // Try to get lead_gen_id or use phone to find lead
+              const savedLeadGenId = (savedContact as any)?.lead_gen_id || leadGenId;
+              let leadGenData = null;
+              
+              if (savedLeadGenId) {
+                leadGenData = await getCompleteLeadGenData(savedLeadGenId);
+              } else if (normalizedPhone) {
+                // Try to find by phone
+                const leadGenLead = await getLeadGenLeadByPhone(normalizedPhone);
+                if (leadGenLead) {
+                  leadGenData = await getCompleteLeadGenData(leadGenLead.id);
+                }
+              }
+              
+              if (leadGenData && leadGenData.lead) {
+                console.log(`[Integration] Found Lead Gen Tool data, merging into contact...`);
+                const mergedContact = mergeLeadGenDataIntoContact(savedContact, leadGenData);
+                
+                // Update contact with merged data
+                await supabaseAdmin
+                  .from('campaign_contacts')
+                  .update(mergedContact)
+                  .eq('id', leadId);
+                
+                console.log(`[Integration] Contact ${leadId} updated with Lead Gen Tool data`);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error('[Integration] Error in fallback data fetch:', fallbackError);
+          // Don't fail the whole operation if fallback fails
         }
 
         // ===== NEW FEATURES INTEGRATION =====

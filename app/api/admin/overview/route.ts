@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getCompleteLeadGenData, mergeLeadGenDataIntoContact } from '@/lib/lead-gen-db-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -125,12 +126,49 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich leads with AI data and email sent times
-    const enrichedLeads = (leads || []).map((lead: any) => ({
+    let enrichedLeads = (leads || []).map((lead: any) => ({
       ...lead,
       personalization: personalizationData[lead.id] || null,
       sendTime: sendTimeData[lead.id] || null,
       lastEmailSentAt: emailSentTimes[lead.id] || null,
     }));
+
+    // Enrich with Lead Gen Tool data for leads that have lead_gen_id or missing data
+    // Do this in batches to avoid too many queries
+    const leadsToEnrich = enrichedLeads.filter((lead: any) => {
+      const hasLeadGenId = lead.lead_gen_id;
+      const hasMissingData = !lead.email || !lead.site || !lead.personalized_message || 
+        (!lead.seo_score && !lead.page_score);
+      return hasLeadGenId || hasMissingData;
+    });
+
+    if (leadsToEnrich.length > 0) {
+      console.log(`[Admin Overview] Enriching ${leadsToEnrich.length} leads with Lead Gen Tool data...`);
+      
+      // Process in parallel but limit concurrency
+      const enrichmentPromises = leadsToEnrich.slice(0, 10).map(async (lead: any) => {
+        try {
+          const leadGenId = lead.lead_gen_id || lead.id;
+          const leadGenData = await getCompleteLeadGenData(leadGenId);
+          
+          if (leadGenData && leadGenData.lead) {
+            return mergeLeadGenDataIntoContact(lead, leadGenData);
+          }
+          return lead;
+        } catch (error) {
+          console.error(`[Admin Overview] Error enriching lead ${lead.id}:`, error);
+          return lead;
+        }
+      });
+
+      const enrichedResults = await Promise.all(enrichmentPromises);
+      
+      // Update the enriched leads array
+      enrichedLeads = enrichedLeads.map((lead: any) => {
+        const enriched = enrichedResults.find((e: any) => e.id === lead.id);
+        return enriched || lead;
+      });
+    }
 
     if (leadsError) {
       console.error('[Admin Overview] Error fetching leads:', leadsError);
