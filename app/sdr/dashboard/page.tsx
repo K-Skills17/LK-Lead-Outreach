@@ -748,49 +748,114 @@ export default function SDRDashboardPage() {
                               {formatDate(lead.created_at)}
                             </p>
                             {lead.status === 'pending' && lead.phone && (
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Send WhatsApp message to ${lead.nome}?`)) return;
-                                  
-                                  const token = sdrToken || localStorage.getItem('sdr_token');
-                                  if (!token) {
-                                    alert('❌ Authentication required');
-                                    router.push('/sdr/login');
-                                    return;
-                                  }
-                                  
-                                  try {
-                                    const response = await fetch('/api/whatsapp/send', {
-                                      method: 'POST',
-                                      headers: {
-                                        'Authorization': `Bearer ${token}`,
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({
-                                        contactId: lead.id,
-                                        skipChecks: true, // Allow manual send
-                                      }),
-                                    });
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Send WhatsApp message to ${lead.nome}?`)) return;
                                     
-                                    const result = await response.json();
-                                    
-                                    if (response.ok && result.success) {
-                                      alert('✅ WhatsApp message sent!');
-                                      // Reload dashboard
-                                      loadDashboardData(token);
-                                    } else {
-                                      alert(`❌ ${result.error || result.reason || 'Failed to send message'}`);
+                                    const userData = localStorage.getItem('sdr_user');
+                                    if (!userData) {
+                                      alert('❌ Authentication required');
+                                      router.push('/sdr/login');
+                                      return;
                                     }
-                                  } catch (err) {
-                                    alert('❌ Failed to send WhatsApp message');
-                                    console.error(err);
-                                  }
-                                }}
-                                className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 font-medium flex items-center gap-1.5"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                                Send WhatsApp
-                              </button>
+                                    
+                                    const currentUser = JSON.parse(userData);
+                                    const sdrId = currentUser.id;
+                                    
+                                    try {
+                                      const response = await fetch('/api/whatsapp/send', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Authorization': `Bearer ${sdrId}`,
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          contactId: lead.id,
+                                          skipChecks: true, // Allow manual send
+                                          includeImages: true, // Include images
+                                        }),
+                                      });
+                                      
+                                      const result = await response.json();
+                                      
+                                      if (response.ok && result.success) {
+                                        alert('✅ WhatsApp message sent!');
+                                        // Reload dashboard
+                                        const token = sdrToken || localStorage.getItem('sdr_token');
+                                        if (token) {
+                                          loadDashboardData(token);
+                                        }
+                                      } else {
+                                        alert(`❌ ${result.error || result.reason || 'Failed to send message'}`);
+                                      }
+                                    } catch (err) {
+                                      alert('❌ Failed to send WhatsApp message');
+                                      console.error(err);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 font-medium flex items-center gap-1.5"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  Send WhatsApp
+                                </button>
+                                {((lead as any).analysis_image_url || (lead as any).landing_page_url) && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Send photo/image to ${lead.nome} via WhatsApp?`)) return;
+                                      
+                                      const userData = localStorage.getItem('sdr_user');
+                                      if (!userData) {
+                                        alert('❌ Authentication required');
+                                        router.push('/sdr/login');
+                                        return;
+                                      }
+                                      
+                                      const currentUser = JSON.parse(userData);
+                                      const sdrId = currentUser.id;
+                                      
+                                      // Build message with image links
+                                      const imageUrl = (lead as any).analysis_image_url || (lead as any).landing_page_url;
+                                      const imageType = (lead as any).analysis_image_url ? 'Análise Visual' : 'Landing Page';
+                                      
+                                      try {
+                                        const response = await fetch('/api/whatsapp/send', {
+                                          method: 'POST',
+                                          headers: {
+                                            'Authorization': `Bearer ${sdrId}`,
+                                            'Content-Type': 'application/json',
+                                          },
+                                          body: JSON.stringify({
+                                            contactId: lead.id,
+                                            messageText: `📸 ${imageType} para ${lead.empresa || lead.nome}:\n\n${imageUrl}`,
+                                            skipChecks: true,
+                                            includeImages: false, // Already including in messageText
+                                          }),
+                                        });
+                                        
+                                        const result = await response.json();
+                                        
+                                        if (response.ok && result.success) {
+                                          alert('✅ Photo sent via WhatsApp!');
+                                          const token = sdrToken || localStorage.getItem('sdr_token');
+                                          if (token) {
+                                            loadDashboardData(token);
+                                          }
+                                        } else {
+                                          alert(`❌ ${result.error || result.reason || 'Failed to send photo'}`);
+                                        }
+                                      } catch (err) {
+                                        alert('❌ Failed to send photo');
+                                        console.error(err);
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-700 font-medium flex items-center gap-1.5"
+                                  >
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                    Send Photo
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
