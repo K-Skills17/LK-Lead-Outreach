@@ -510,6 +510,8 @@ export default function AdminDashboard() {
       setGeneratingImage(contactId);
       setError('');
 
+      console.log('[Admin] Generating image for contact ID:', contactId);
+
       const response = await fetch('/api/admin/leads/generate-image', {
         method: 'POST',
         headers: {
@@ -525,7 +527,8 @@ export default function AdminDashboard() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate image');
+        console.error('[Admin] Image generation failed:', result);
+        throw new Error(result.error || result.details || 'Failed to generate image');
       }
 
       if (result.alreadyExists) {
@@ -539,8 +542,8 @@ export default function AdminDashboard() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate image';
       setError(errorMessage);
-      alert(`❌ ${errorMessage}`);
-      console.error(err);
+      console.error('[Admin] Image generation error:', err);
+      alert(`❌ ${errorMessage}\n\nContact ID: ${contactId}\n\nPlease check the browser console for more details.`);
     } finally {
       setGeneratingImage(null);
     }
@@ -1265,9 +1268,33 @@ export default function AdminDashboard() {
                                     Email
                                   </button>
                                 )}
+                                {lead.phone && (
+                                  <button
+                                    onClick={() => {
+                                      setWhatsappLead(lead);
+                                      const defaultMessage = (lead as any).personalized_message || 
+                                        `Olá ${lead.nome || 'Cliente'}! 👋\n\nVi que você trabalha na ${lead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\nEquipe LK Digital`;
+                                      setWhatsappMessage(defaultMessage);
+                                      setIncludeImagesInWhatsApp(true);
+                                      setShowWhatsAppModal(true);
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors"
+                                    title="Send WhatsApp"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    WhatsApp
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => handleGenerateImage(lead.id, false)}
-                                  disabled={generatingImage === lead.id}
+                                  onClick={() => {
+                                    if (!lead.id) {
+                                      alert('❌ Invalid lead ID. Please refresh the page and try again.');
+                                      return;
+                                    }
+                                    console.log('[Admin] Generate image clicked for lead:', lead.nome, lead.empresa, 'ID:', lead.id);
+                                    handleGenerateImage(lead.id, false);
+                                  }}
+                                  disabled={generatingImage === lead.id || !lead.id}
                                   className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 border border-purple-200 flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Generate Analysis Image"
                                 >
@@ -2672,6 +2699,280 @@ export default function AdminDashboard() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Message Crafting Modal */}
+      {showEmailModal && emailLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Craft Email Message</h3>
+              <button
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailLead(null);
+                  setEmailSubject('');
+                  setEmailContent('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>To:</strong> {emailLead.nome} ({emailLead.empresa}) - {emailLead.email}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Email subject..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message Content (HTML supported)
+                </label>
+                <textarea
+                  value={emailContent}
+                  onChange={(e) => setEmailContent(e.target.value)}
+                  placeholder="Write your email message here..."
+                  rows={12}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  You can use HTML tags for formatting. Images and landing pages will be automatically included if available.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={async () => {
+                    if (!emailSubject.trim() || !emailContent.trim()) {
+                      alert('Please fill in both subject and message content');
+                      return;
+                    }
+
+                    try {
+                      setSendingEmail(true);
+                      const response = await fetch('/api/admin/emails/send', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${authToken}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          contactId: emailLead.id,
+                          subject: emailSubject,
+                          htmlContent: emailContent.replace(/\n/g, '<br>'),
+                          textContent: emailContent,
+                        }),
+                      });
+
+                      const result = await response.json();
+
+                      if (response.ok && result.success) {
+                        alert('✅ Email sent successfully!');
+                        setShowEmailModal(false);
+                        setEmailLead(null);
+                        setEmailSubject('');
+                        setEmailContent('');
+                        await loadOverview(authToken);
+                      } else {
+                        alert(`❌ ${result.error || result.message || 'Failed to send email'}`);
+                      }
+                    } catch (err) {
+                      alert('❌ Failed to send email');
+                      console.error(err);
+                    } finally {
+                      setSendingEmail(false);
+                    }
+                  }}
+                  disabled={sendingEmail || !emailSubject.trim() || !emailContent.trim()}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Send Email
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEmailModal(false);
+                    setEmailLead(null);
+                    setEmailSubject('');
+                    setEmailContent('');
+                  }}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Message Crafting Modal */}
+      {showWhatsAppModal && whatsappLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Craft WhatsApp Message</h3>
+              <button
+                onClick={() => {
+                  setShowWhatsAppModal(false);
+                  setWhatsappLead(null);
+                  setWhatsappMessage('');
+                  setIncludeImagesInWhatsApp(true);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>To:</strong> {whatsappLead.nome} ({whatsappLead.empresa}) - {whatsappLead.phone}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message Text
+                </label>
+                <textarea
+                  value={whatsappMessage}
+                  onChange={(e) => setWhatsappMessage(e.target.value)}
+                  placeholder="Write your WhatsApp message here..."
+                  rows={10}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This is a human-like manual send. Images and landing pages will be included if available and enabled below.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="includeImages"
+                  checked={includeImagesInWhatsApp}
+                  onChange={(e) => setIncludeImagesInWhatsApp(e.target.checked)}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <label htmlFor="includeImages" className="text-sm text-gray-700 cursor-pointer">
+                  Include analysis images and landing pages in message
+                </label>
+              </div>
+
+              {((whatsappLead as any).analysis_image_url || (whatsappLead as any).landing_page_url) && includeImagesInWhatsApp && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800 font-medium mb-2">Images that will be included:</p>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    {(whatsappLead as any).analysis_image_url && (
+                      <li>• Analysis Image: {(whatsappLead as any).analysis_image_url}</li>
+                    )}
+                    {(whatsappLead as any).landing_page_url && (
+                      <li>• Landing Page: {(whatsappLead as any).landing_page_url}</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={async () => {
+                    if (!whatsappMessage.trim()) {
+                      alert('Please enter a message');
+                      return;
+                    }
+
+                    try {
+                      setSendingWhatsApp(true);
+                      const response = await fetch('/api/whatsapp/send', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${authToken}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          contactId: whatsappLead.id,
+                          messageText: whatsappMessage,
+                          skipChecks: true, // Manual send - skip all checks
+                          includeImages: includeImagesInWhatsApp,
+                        }),
+                      });
+
+                      const result = await response.json();
+
+                      if (response.ok && result.success) {
+                        alert('✅ WhatsApp message sent successfully!');
+                        setShowWhatsAppModal(false);
+                        setWhatsappLead(null);
+                        setWhatsappMessage('');
+                        setIncludeImagesInWhatsApp(true);
+                        await loadOverview(authToken);
+                      } else {
+                        alert(`❌ ${result.error || result.reason || 'Failed to send WhatsApp message'}`);
+                      }
+                    } catch (err) {
+                      alert('❌ Failed to send WhatsApp message');
+                      console.error(err);
+                    } finally {
+                      setSendingWhatsApp(false);
+                    }
+                  }}
+                  disabled={sendingWhatsApp || !whatsappMessage.trim()}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
+                >
+                  {sendingWhatsApp ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-4 h-4" />
+                      Send WhatsApp
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowWhatsAppModal(false);
+                    setWhatsappLead(null);
+                    setWhatsappMessage('');
+                    setIncludeImagesInWhatsApp(true);
+                  }}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

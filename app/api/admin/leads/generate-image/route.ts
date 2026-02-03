@@ -29,6 +29,11 @@ export async function POST(request: NextRequest) {
     const validated = generateImageSchema.parse(body);
 
     // Get contact details
+    console.log('[GenerateImage] Looking for contact with ID:', validated.contactId);
+    console.log('[GenerateImage] Contact ID type:', typeof validated.contactId);
+    console.log('[GenerateImage] Contact ID length:', validated.contactId?.length);
+    
+    // First, verify the contact exists
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
       .select(
@@ -41,9 +46,54 @@ export async function POST(request: NextRequest) {
       .eq('id', validated.contactId)
       .maybeSingle();
 
-    if (contactError || !contact) {
-      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    if (contactError) {
+      console.error('[GenerateImage] Database error:', contactError);
+      console.error('[GenerateImage] Error code:', contactError.code);
+      console.error('[GenerateImage] Error details:', contactError.details);
+      console.error('[GenerateImage] Error hint:', contactError.hint);
+      
+      return NextResponse.json({ 
+        error: 'Database error', 
+        details: contactError.message,
+        code: contactError.code,
+        contactId: validated.contactId 
+      }, { status: 500 });
     }
+
+    if (!contact) {
+      // Try to find any contact with similar ID for debugging
+      const { data: allContacts, error: sampleError } = await supabaseAdmin
+        .from('campaign_contacts')
+        .select('id, nome, empresa')
+        .limit(5);
+      
+      console.error('[GenerateImage] Contact not found. Contact ID:', validated.contactId);
+      console.error('[GenerateImage] Total contacts in database:', allContacts?.length || 0);
+      console.error('[GenerateImage] Sample contact IDs in database:', allContacts?.map(c => ({ id: c.id, nome: c.nome, empresa: c.empresa })));
+      
+      // Also try to find by partial match (in case of ID format issues)
+      if (validated.contactId) {
+        const { data: partialMatch } = await supabaseAdmin
+          .from('campaign_contacts')
+          .select('id, nome, empresa')
+          .ilike('id', `%${validated.contactId.slice(-8)}%`)
+          .limit(3);
+        
+        if (partialMatch && partialMatch.length > 0) {
+          console.error('[GenerateImage] Found partial matches:', partialMatch);
+        }
+      }
+      
+      return NextResponse.json({ 
+        error: 'Contact not found',
+        contactId: validated.contactId,
+        hint: 'Make sure the contact ID exists in the campaign_contacts table',
+        totalContactsInDb: allContacts?.length || 0,
+        sampleContactIds: allContacts?.slice(0, 3).map(c => c.id) || []
+      }, { status: 404 });
+    }
+    
+    console.log('[GenerateImage] Contact found:', contact.nome, contact.empresa, 'ID:', contact.id);
 
     // Type assertion for contact with all needed properties
     const contactData = contact as any;

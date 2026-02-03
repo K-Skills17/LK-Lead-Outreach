@@ -1192,6 +1192,167 @@ export default function SDRDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* WhatsApp Message Crafting Modal */}
+      {showWhatsAppModal && whatsappLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Craft WhatsApp Message</h3>
+              <button
+                onClick={() => {
+                  setShowWhatsAppModal(false);
+                  setWhatsappLead(null);
+                  setWhatsappMessage('');
+                  setIncludeImagesInWhatsApp(true);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>To:</strong> {whatsappLead.nome} ({whatsappLead.empresa}) - {whatsappLead.phone}
+              </p>
+              <p className="text-xs text-green-700 mt-1">
+                💬 Human-like manual sending - This message will be sent immediately
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message Text
+                </label>
+                <textarea
+                  value={whatsappMessage}
+                  onChange={(e) => setWhatsappMessage(e.target.value)}
+                  placeholder="Write your WhatsApp message here..."
+                  rows={12}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Craft your personalized message. This is a manual, human-like send - no automation delays.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="includeImagesSdr"
+                  checked={includeImagesInWhatsApp}
+                  onChange={(e) => setIncludeImagesInWhatsApp(e.target.checked)}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <label htmlFor="includeImagesSdr" className="text-sm text-gray-700 cursor-pointer">
+                  Include analysis images and landing pages in message
+                </label>
+              </div>
+
+              {((whatsappLead as any).analysis_image_url || (whatsappLead as any).landing_page_url) && includeImagesInWhatsApp && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800 font-medium mb-2">Images that will be included:</p>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    {(whatsappLead as any).analysis_image_url && (
+                      <li>• Analysis Image: {(whatsappLead as any).analysis_image_url}</li>
+                    )}
+                    {(whatsappLead as any).landing_page_url && (
+                      <li>• Landing Page: {(whatsappLead as any).landing_page_url}</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={async () => {
+                    if (!whatsappMessage.trim()) {
+                      alert('Please enter a message');
+                      return;
+                    }
+
+                    const userData = localStorage.getItem('sdr_user');
+                    if (!userData) {
+                      alert('❌ Authentication required');
+                      router.push('/sdr/login');
+                      return;
+                    }
+
+                    const currentUser = JSON.parse(userData);
+                    const sdrId = currentUser.id;
+
+                    try {
+                      setSendingWhatsApp(true);
+                      const response = await fetch('/api/whatsapp/send', {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${sdrId}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          contactId: whatsappLead.id,
+                          messageText: whatsappMessage,
+                          skipChecks: true, // Manual send - skip all checks for human-like sending
+                          includeImages: includeImagesInWhatsApp,
+                        }),
+                      });
+
+                      const result = await response.json();
+
+                      if (response.ok && result.success) {
+                        alert('✅ WhatsApp message sent successfully!');
+                        setShowWhatsAppModal(false);
+                        setWhatsappLead(null);
+                        setWhatsappMessage('');
+                        setIncludeImagesInWhatsApp(true);
+                        // Reload dashboard
+                        const token = sdrToken || localStorage.getItem('sdr_token');
+                        if (token) {
+                          loadDashboardData(token);
+                        }
+                      } else {
+                        alert(`❌ ${result.error || result.reason || 'Failed to send WhatsApp message'}`);
+                      }
+                    } catch (err) {
+                      alert('❌ Failed to send WhatsApp message');
+                      console.error(err);
+                    } finally {
+                      setSendingWhatsApp(false);
+                    }
+                  }}
+                  disabled={sendingWhatsApp || !whatsappMessage.trim()}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2"
+                >
+                  {sendingWhatsApp ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-4 h-4" />
+                      Send WhatsApp
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowWhatsAppModal(false);
+                    setWhatsappLead(null);
+                    setWhatsappMessage('');
+                    setIncludeImagesInWhatsApp(true);
+                  }}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
