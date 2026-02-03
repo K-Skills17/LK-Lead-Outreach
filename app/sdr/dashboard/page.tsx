@@ -97,6 +97,7 @@ export default function SDRDashboardPage() {
     lastSeen: string | null;
   } | null>(null);
   const [connectingWhatsapp, setConnectingWhatsapp] = useState(false);
+  const [sdrToken, setSdrToken] = useState<string | null>(null);
 
   useEffect(() => {
     // Check authentication
@@ -108,6 +109,7 @@ export default function SDRDashboardPage() {
       return;
     }
 
+    setSdrToken(token);
     setUser(JSON.parse(userData));
     loadDashboardData(token);
     loadWhatsappStatus(token);
@@ -750,6 +752,13 @@ export default function SDRDashboardPage() {
                                 onClick={async () => {
                                   if (!confirm(`Send WhatsApp message to ${lead.nome}?`)) return;
                                   
+                                  const token = sdrToken || localStorage.getItem('sdr_token');
+                                  if (!token) {
+                                    alert('❌ Authentication required');
+                                    router.push('/sdr/login');
+                                    return;
+                                  }
+                                  
                                   try {
                                     const response = await fetch('/api/whatsapp/send', {
                                       method: 'POST',
@@ -768,7 +777,7 @@ export default function SDRDashboardPage() {
                                     if (response.ok && result.success) {
                                       alert('✅ WhatsApp message sent!');
                                       // Reload dashboard
-                                      loadDashboard(token);
+                                      loadDashboardData(token);
                                     } else {
                                       alert(`❌ ${result.error || result.reason || 'Failed to send message'}`);
                                     }
