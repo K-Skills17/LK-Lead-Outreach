@@ -93,10 +93,10 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
     
-    console.log('[GenerateImage] Contact found:', contact.nome, contact.empresa, 'ID:', contact.id);
-
     // Type assertion for contact with all needed properties
     const contactData = contact as any;
+    
+    console.log('[GenerateImage] Contact found:', contactData.nome, contactData.empresa, 'ID:', contactData.id);
 
     // Check if image already exists
     if (contactData.analysis_image_url && !validated.force) {
