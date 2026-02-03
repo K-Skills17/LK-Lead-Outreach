@@ -21,6 +21,7 @@ import {
   WifiOff,
   Eye,
   MousePointerClick,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
