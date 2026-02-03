@@ -55,6 +55,7 @@ interface Lead {
   phone: string;
   status: string;
   created_at: string;
+  landing_page_url?: string;
   campaigns?: {
     id: string;
     name: string;
@@ -1119,7 +1120,7 @@ export default function SDRDashboardPage() {
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900">
-                {manualUrlLead.landing_page_url ? 'Edit' : 'Add'} Landing Page URL
+                {(manualUrlLead as any).landing_page_url ? 'Edit' : 'Add'} Landing Page URL
               </h3>
               <button
                 onClick={() => {
