@@ -319,7 +319,7 @@ export async function getLeadsForCampaign(
     }
 
     return {
-      leads: (data || []) as (LeadGenLead & {
+      leads: (data || []) as unknown as (LeadGenLead & {
         enrichment?: LeadGenEnrichment | null;
         analysis?: LeadGenAnalysis | null;
         outreach?: LeadGenOutreach | null;
