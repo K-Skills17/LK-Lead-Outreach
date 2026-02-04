@@ -319,7 +319,11 @@ export async function getLeadsForCampaign(
     }
 
     return {
-      leads: data || [],
+      leads: (data || []) as (LeadGenLead & {
+        enrichment?: LeadGenEnrichment | null;
+        analysis?: LeadGenAnalysis | null;
+        outreach?: LeadGenOutreach | null;
+      })[],
       total: count || 0,
     };
   } catch (error) {
