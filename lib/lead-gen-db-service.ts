@@ -319,7 +319,7 @@ export async function getLeadsForCampaign(
     }
 
     return {
-      leads: (data || []) as (LeadGenLead & {
+      leads: (data || []) as unknown as (LeadGenLead & {
         enrichment?: LeadGenEnrichment | null;
         analysis?: LeadGenAnalysis | null;
         outreach?: LeadGenOutreach | null;
@@ -1243,10 +1243,11 @@ export function mergeLeadGenDataIntoContact(
     if (!merged.send_time_scheduled && an.send_time_scheduled)
       merged.send_time_scheduled = an.send_time_scheduled;
     if (!merged.pain_points && an.pain_points) {
-      merged.pain_points = Array.isArray(an.pain_points)
-        ? an.pain_points
-        : typeof an.pain_points === 'object'
-        ? Object.keys(an.pain_points).filter((k) => an.pain_points[k])
+      const painPoints = an.pain_points;
+      merged.pain_points = Array.isArray(painPoints)
+        ? painPoints
+        : typeof painPoints === 'object' && painPoints !== null
+        ? Object.keys(painPoints).filter((k) => painPoints[k as keyof typeof painPoints])
         : [];
     }
   }
