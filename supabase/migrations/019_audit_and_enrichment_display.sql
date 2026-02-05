@@ -15,6 +15,10 @@ ALTER TABLE campaign_contacts
 
 -- marketing_tags may already exist (TEXT[] in 017); merge stores from enrichment in memory
 
+-- Email validation from enrichment (JSONB)
+ALTER TABLE campaign_contacts
+  ADD COLUMN IF NOT EXISTS email_validation JSONB NULL;
+
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_gpb_score
   ON campaign_contacts(gpb_completeness_score) WHERE gpb_completeness_score IS NOT NULL;
 

@@ -11,6 +11,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   isLeadGenDatabaseConfigured,
   getCompleteLeadGenData,
+  mergeLeadGenDataIntoContact,
+  computeDisplayGpbScore,
 } from '@/lib/lead-gen-db-service';
 
 export const runtime = 'nodejs';
@@ -92,11 +94,68 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Build merged contact for computed GPB and filtered audit_results
+    const mergedContact = mergeLeadGenDataIntoContact(contact, lgData);
+    const gpbDisplay = computeDisplayGpbScore(mergedContact);
+
+    // Filter audit_results for display (skip audit timeout, estimated monthly loss errors)
+    const skipErrorKeys = [
+      'audit timeout',
+      'audit_timeout',
+      'error to find estimated monthly loss',
+      'estimated_monthly_loss',
+      'estimatedMonthlyLoss',
+    ];
+    const filterAuditResults = (obj: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const lower = String(k).toLowerCase();
+        const skip = skipErrorKeys.some(
+          (err) => lower.includes(err.toLowerCase().replace(/\s/g, '_')) || lower.includes(err.toLowerCase())
+        );
+        if (skip) continue;
+        if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
+          out[k] = filterAuditResults(v as Record<string, unknown>);
+        } else {
+          out[k] = v;
+        }
+      }
+      return out;
+    };
+    const auditResultsFiltered =
+      lgData.audit?.audit_results && Object.keys(lgData.audit.audit_results).length > 0
+        ? filterAuditResults(lgData.audit.audit_results as Record<string, unknown>)
+        : null;
+
+    // All phone numbers as potential WhatsApp (from enrichment + lead)
+    const enr = lgData.enrichment;
+    const enrWhatsapp =
+      typeof enr?.whatsapp_phone === 'string'
+        ? enr.whatsapp_phone
+        : (enr?.whatsapp_phone as { number?: string })?.number;
+    const potentialWhatsappNumbers = [
+      ...(Array.isArray(enr?.all_phone_numbers) ? enr.all_phone_numbers : []),
+      ...(Array.isArray(enr?.phone_numbers) ? enr.phone_numbers : []),
+      ...(enrWhatsapp ? [enrWhatsapp] : []),
+      ...(lgData.lead.phone ? [lgData.lead.phone] : []),
+    ].filter(Boolean);
+    const uniquePhones = [...new Set(potentialWhatsappNumbers)] as string[];
+
     // Format response with all Lead Gen intelligence
     return NextResponse.json({
       success: true,
       connected: true,
       data: {
+        // Computed GPB for display (fixes 25-for-everyone when we have rating/reviews)
+        gpb_completeness_score_display: gpbDisplay ?? lgData.audit?.gpb_completeness_score ?? lgData.audit?.gpb_completeness_Score ?? null,
+        audit: lgData.audit
+          ? {
+              rating: lgData.audit.rating ?? (lgData.audit.audit_results as Record<string, unknown>)?.['rating'] ?? lgData.lead.rating,
+              review_count: lgData.audit.review_count ?? (lgData.audit.audit_results as Record<string, unknown>)?.['review_count'] ?? (lgData.audit.audit_results as Record<string, unknown>)?.['reviews'] ?? lgData.lead.reviews,
+              gpb_completeness_score: lgData.audit.gpb_completeness_score ?? lgData.audit.gpb_completeness_Score ?? (lgData.audit.audit_results as Record<string, unknown>)?.['gpb_completeness_score'] ?? (lgData.audit.audit_results as Record<string, unknown>)?.['gpb_completeness_Score'],
+              audit_results: auditResultsFiltered,
+            }
+          : null,
         lead: {
           id: lgData.lead.id,
           business_name: lgData.lead.business_name,
@@ -132,6 +191,9 @@ export async function POST(request: NextRequest) {
               whatsapp_phone: lgData.enrichment.whatsapp_phone,
               found_on_page: lgData.enrichment.found_on_page,
               marketing_tags: lgData.enrichment.marketing_tags,
+              email_validation: lgData.enrichment.email_validation,
+              all_phone_numbers: uniquePhones.length > 0 ? uniquePhones : (lgData.enrichment.all_phone_numbers ?? lgData.enrichment.phone_numbers ?? []),
+              potential_whatsapp_numbers: uniquePhones.length > 0 ? uniquePhones : null,
             }
           : null,
         analysis: lgData.analysis

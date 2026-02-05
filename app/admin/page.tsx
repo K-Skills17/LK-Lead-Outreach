@@ -29,6 +29,8 @@ import {
   Send,
   Trash2,
   Image as ImageIcon,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 
 interface SDR {
@@ -206,6 +208,8 @@ export default function AdminDashboard() {
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [loadingDebug, setLoadingDebug] = useState(false);
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [syncingLeadGen, setSyncingLeadGen] = useState(false);
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem('admin_token');
@@ -653,6 +657,34 @@ export default function AdminDashboard() {
       setLeadsToDelete(Array.from(selectedLeads));
     }
     setShowDeleteConfirm(true);
+  };
+
+  const handleSyncLeadGen = async (contactIds: string[]) => {
+    if (contactIds.length === 0) return;
+    try {
+      setSyncingLeadGen(true);
+      const response = await fetch('/api/admin/leads/sync-lead-gen', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contactIds }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        alert(`Synced ${result.synced} lead(s) from Lead Gen DB.${result.failed > 0 ? ` ${result.failed} had no matching data.` : ''}`);
+        await loadOverview(authToken);
+        setSelectedLeads(new Set());
+        if (selectedLead && contactIds.includes(selectedLead.id)) setSelectedLead(null);
+      } else {
+        alert(result.error || 'Failed to sync from Lead Gen DB');
+      }
+    } catch (err) {
+      alert('Failed to sync from Lead Gen DB');
+    } finally {
+      setSyncingLeadGen(false);
+    }
   };
 
   const loadDebugData = async () => {
@@ -1301,9 +1333,31 @@ export default function AdminDashboard() {
             {/* Leads Tab */}
             {selectedTab === 'leads' && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
-                  <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <h3 className="text-lg font-bold text-gray-900">All Leads</h3>
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by name, company, phone, email..."
+                        value={leadSearchQuery}
+                        onChange={(e) => setLeadSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                    {leadSearchQuery.trim() && (
+                      <span className="text-sm text-gray-500 whitespace-nowrap">
+                        {data.leads.filter((l: Lead) => {
+                          const q = leadSearchQuery.trim().toLowerCase();
+                          return !q || [l.nome, l.empresa, l.phone, (l as any).email].some(
+                            (v) => v && String(v).toLowerCase().includes(q)
+                          );
+                        }).length} of {data.leads.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={loadDebugData}
                       disabled={loadingDebug}
@@ -1325,6 +1379,24 @@ export default function AdminDashboard() {
                     {selectedLeads.size > 0 && (
                       <>
                         <button
+                          onClick={() => handleSyncLeadGen(Array.from(selectedLeads))}
+                          disabled={syncingLeadGen}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50"
+                          title="Pull latest enrichment, audit, GPB, WhatsApp numbers from Lead Gen DB"
+                        >
+                          {syncingLeadGen ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Syncing...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              Sync from Lead Gen DB ({selectedLeads.size})
+                            </>
+                          )}
+                        </button>
+                        <button
                           onClick={() => setShowAssignModal(true)}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                         >
@@ -1345,6 +1417,16 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </div>
+                {(() => {
+                  const filteredLeads = leadSearchQuery.trim()
+                    ? data.leads.filter((l: Lead) => {
+                        const q = leadSearchQuery.trim().toLowerCase();
+                        return [l.nome, l.empresa, l.phone, (l as any).email].some(
+                          (v) => v && String(v).toLowerCase().includes(q)
+                        );
+                      })
+                    : data.leads;
+                  return (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1354,12 +1436,12 @@ export default function AdminDashboard() {
                             type="checkbox"
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedLeads(new Set(data.leads.map(l => l.id)));
+                                setSelectedLeads(new Set(filteredLeads.map((l: Lead) => l.id)));
                               } else {
                                 setSelectedLeads(new Set());
                               }
                             }}
-                            checked={selectedLeads.size === data.leads.length && data.leads.length > 0}
+                            checked={filteredLeads.length > 0 && selectedLeads.size === filteredLeads.length}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </th>
@@ -1378,7 +1460,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.leads.map((lead) => {
+                      {filteredLeads.map((lead: Lead) => {
                         const assignedSdr = data.sdrs.find(s => s.id === lead.assigned_sdr_id);
                         const tier = lead.personalization?.tier;
                         const score = lead.personalization?.score;
@@ -1563,6 +1645,8 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -2107,15 +2191,30 @@ export default function AdminDashboard() {
                   <h2 className="text-2xl font-bold">{selectedLead.nome}</h2>
                   <p className="text-blue-100 mt-1">{selectedLead.empresa}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowLeadDetail(false);
-                    setSelectedLead(null);
-                  }}
-                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSyncLeadGen([selectedLead.id])}
+                    disabled={syncingLeadGen}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg flex items-center gap-2 text-sm font-medium disabled:opacity-50 transition-colors"
+                    title="Pull latest data from Lead Gen DB (enrichment, audit, GPB, WhatsApp)"
+                  >
+                    {syncingLeadGen ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    {syncingLeadGen ? 'Syncing...' : 'Refresh from Lead Gen DB'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowLeadDetail(false);
+                      setSelectedLead(null);
+                    }}
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2459,7 +2558,7 @@ export default function AdminDashboard() {
                   )}
 
                   {/* Enrichment: has_contact_page, has_booking_system, marketing_tags, potential WhatsApp */}
-                  {((selectedLead as any).has_contact_page !== undefined || (selectedLead as any).has_booking_system !== undefined || (selectedLead as any).marketing_tags || (selectedLead as any).potential_whatsapp_numbers?.length) && (
+                  {((selectedLead as any).has_contact_page !== undefined || (selectedLead as any).has_booking_system !== undefined || (selectedLead as any).marketing_tags || (selectedLead as any).potential_whatsapp_numbers?.length || (selectedLead as any).email_validation) && (
                     <div className="bg-white/80 rounded-xl p-4 mb-4">
                       <p className="text-xs text-gray-500 mb-3 font-semibold">📋 Enrichment (Contact / Booking / Tags)</p>
                       <div className="flex flex-wrap gap-2 mb-2">
@@ -2494,6 +2593,14 @@ export default function AdminDashboard() {
                               <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">{p}</span>
                             ))}
                           </div>
+                        </div>
+                      )}
+                      {(selectedLead as any).email_validation && typeof (selectedLead as any).email_validation === 'object' && (
+                        <div className="mt-2">
+                          <span className="text-gray-600 font-medium text-xs">Email validation: </span>
+                          <pre className="text-xs bg-gray-100 p-2 rounded mt-0.5 overflow-x-auto max-h-24 overflow-y-auto">
+                            {JSON.stringify((selectedLead as any).email_validation, null, 2)}
+                          </pre>
                         </div>
                       )}
                     </div>

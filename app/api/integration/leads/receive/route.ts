@@ -833,7 +833,7 @@ export async function POST(request: NextRequest) {
           results.lead_ids.push(leadId);
         }
 
-        // Fallback: If data seems incomplete, try to fetch from Lead Gen Tool tables
+        // Always merge Lead Gen Tool data when we have lead_gen_id so audit, enrichment, GPB, potential_whatsapp_numbers persist
         try {
           const { data: savedContact } = await supabaseAdmin
             .from('campaign_contacts')
@@ -842,47 +842,25 @@ export async function POST(request: NextRequest) {
             .single();
           
           if (savedContact) {
-            // Check if critical data is missing
-            const hasMissingData = !savedContact.email || 
-              !savedContact.site || 
-              !savedContact.personalized_message ||
-              !savedContact.report_url ||
-              (!savedContact.seo_score && !savedContact.page_score);
-            
-            if (hasMissingData) {
-              console.log(`[Integration] Missing data detected for lead ${leadId}, fetching from Lead Gen Tool tables...`);
-              
-              // Try to get lead_gen_id or use phone to find lead
-              const savedLeadGenId = (savedContact as any)?.lead_gen_id || leadGenId;
-              let leadGenData = null;
-              
-              if (savedLeadGenId) {
-                leadGenData = await getCompleteLeadGenData(savedLeadGenId);
-              } else if (normalizedPhone) {
-                // Try to find by phone
-                const leadGenLead = await getLeadGenLeadByPhone(normalizedPhone);
-                if (leadGenLead) {
-                  leadGenData = await getCompleteLeadGenData(leadGenLead.id);
-                }
-              }
-              
-              if (leadGenData && leadGenData.lead) {
-                console.log(`[Integration] Found Lead Gen Tool data, merging into contact...`);
-                const mergedContact = mergeLeadGenDataIntoContact(savedContact, leadGenData);
-                
-                // Update contact with merged data
-                await supabaseAdmin
-                  .from('campaign_contacts')
-                  .update(mergedContact)
-                  .eq('id', leadId);
-                
-                console.log(`[Integration] Contact ${leadId} updated with Lead Gen Tool data`);
-              }
+            const savedLeadGenId = (savedContact as any)?.lead_gen_id || leadGenId;
+            let leadGenData = null;
+            if (savedLeadGenId) {
+              leadGenData = await getCompleteLeadGenData(savedLeadGenId);
+            } else if (normalizedPhone) {
+              const leadGenLead = await getLeadGenLeadByPhone(normalizedPhone);
+              if (leadGenLead) leadGenData = await getCompleteLeadGenData(leadGenLead.id);
+            }
+            if (leadGenData && leadGenData.lead) {
+              const mergedContact = mergeLeadGenDataIntoContact(savedContact, leadGenData);
+              await supabaseAdmin
+                .from('campaign_contacts')
+                .update(mergedContact)
+                .eq('id', leadId);
+              console.log(`[Integration] Contact ${leadId} updated with Lead Gen Tool data (audit, enrichment, GPB, WhatsApp numbers)`);
             }
           }
         } catch (fallbackError) {
-          console.error('[Integration] Error in fallback data fetch:', fallbackError);
-          // Don't fail the whole operation if fallback fails
+          console.error('[Integration] Error merging Lead Gen data:', fallbackError);
         }
 
         // ===== NEW FEATURES INTEGRATION =====

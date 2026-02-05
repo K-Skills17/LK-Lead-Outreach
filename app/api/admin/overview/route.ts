@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
       console.log(`[Admin Overview] Enriching ${leadsToEnrich.length} leads with Lead Gen Tool data...`);
       
       // Process in parallel but limit concurrency
-      const enrichmentPromises = leadsToEnrich.slice(0, 10).map(async (lead: any) => {
+      const enrichmentPromises = leadsToEnrich.slice(0, 50).map(async (lead: any) => {
         try {
           const leadGenId = lead.lead_gen_id || lead.id;
           const leadGenData = await getCompleteLeadGenData(leadGenId);

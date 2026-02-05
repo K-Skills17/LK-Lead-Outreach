@@ -2091,8 +2091,8 @@ export default function SDRDashboardPage() {
                     </div>
                   )}
 
-                  {/* Enrichment: has_contact_page, has_booking_system, marketing_tags, potential WhatsApp numbers */}
-                  {((selectedLead as any).has_contact_page !== undefined || (selectedLead as any).has_booking_system !== undefined || (selectedLead as any).marketing_tags || (selectedLead as any).potential_whatsapp_numbers?.length) && (
+                  {/* Enrichment: has_contact_page, has_booking_system, marketing_tags, potential WhatsApp numbers, email_validation */}
+                  {((selectedLead as any).has_contact_page !== undefined || (selectedLead as any).has_booking_system !== undefined || (selectedLead as any).marketing_tags || (selectedLead as any).potential_whatsapp_numbers?.length || (selectedLead as any).email_validation) && (
                     <div className="bg-white/80 rounded-xl p-4 mb-4">
                       <p className="text-xs text-gray-500 mb-3 font-semibold">📋 Enrichment (Contact / Booking / Tags)</p>
                       <div className="flex flex-wrap gap-2 mb-2">
@@ -2119,7 +2119,7 @@ export default function SDRDashboardPage() {
                           </span>
                         </div>
                       )}
-                      {(selectedLead as any).potential_whatsapp_numbers && (selectedLead as any).potential_whatsapp_numbers.length > 0 && (
+                        {(selectedLead as any).potential_whatsapp_numbers && (selectedLead as any).potential_whatsapp_numbers.length > 0 && (
                         <div>
                           <span className="text-gray-600 font-medium text-xs">Potential WhatsApp numbers: </span>
                           <div className="flex flex-wrap gap-1 mt-1">
@@ -2127,6 +2127,14 @@ export default function SDRDashboardPage() {
                               <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">{p}</span>
                             ))}
                           </div>
+                        </div>
+                      )}
+                      {(selectedLead as any).email_validation && typeof (selectedLead as any).email_validation === 'object' && (
+                        <div className="mt-2">
+                          <span className="text-gray-600 font-medium text-xs">Email validation: </span>
+                          <pre className="text-xs bg-gray-100 p-2 rounded mt-0.5 overflow-x-auto max-h-24 overflow-y-auto">
+                            {JSON.stringify((selectedLead as any).email_validation, null, 2)}
+                          </pre>
                         </div>
                       )}
                     </div>
@@ -2354,6 +2362,17 @@ export default function SDRDashboardPage() {
                             {leadGenDetailData.enrichment.found_on_page && (
                               <p className="text-white/80"><span className="text-blue-300">Found on:</span> {leadGenDetailData.enrichment.found_on_page}</p>
                             )}
+                            {leadGenDetailData.enrichment.email_validation && (
+                              <p className="text-white/80 mt-2"><span className="text-blue-300">Email validation:</span></p>
+                              <pre className="text-xs text-white/70 mt-0.5 bg-black/20 p-2 rounded overflow-x-auto max-h-20 overflow-y-auto">
+                                {typeof leadGenDetailData.enrichment.email_validation === 'object'
+                                  ? JSON.stringify(leadGenDetailData.enrichment.email_validation, null, 2)
+                                  : String(leadGenDetailData.enrichment.email_validation)}
+                              </pre>
+                            )}
+                            {leadGenDetailData.enrichment.potential_whatsapp_numbers?.length > 0 && (
+                              <p className="text-white/80 mt-2"><span className="text-blue-300">Potential WhatsApp:</span> {leadGenDetailData.enrichment.potential_whatsapp_numbers.join(', ')}</p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2369,6 +2388,43 @@ export default function SDRDashboardPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Audit: rating, review_count, GPB completeness, audit_results (errors like timeout / estimated loss filtered) */}
+                    {(leadGenDetailData.audit || leadGenDetailData.gpb_completeness_score_display != null) && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                        <p className="text-xs text-amber-300 font-semibold mb-2">Audit & GPB</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+                          {leadGenDetailData.audit?.rating != null && (
+                            <div>
+                              <p className="text-white/50 text-xs">Rating</p>
+                              <p className="text-white font-bold">⭐ {leadGenDetailData.audit.rating}/5</p>
+                            </div>
+                          )}
+                          {leadGenDetailData.audit?.review_count != null && (
+                            <div>
+                              <p className="text-white/50 text-xs">Reviews</p>
+                              <p className="text-white font-bold">{leadGenDetailData.audit.review_count}</p>
+                            </div>
+                          )}
+                          {(leadGenDetailData.gpb_completeness_score_display != null || leadGenDetailData.audit?.gpb_completeness_score != null) && (
+                            <div>
+                              <p className="text-white/50 text-xs">GPB completeness</p>
+                              <p className="text-white font-bold">
+                                {leadGenDetailData.gpb_completeness_score_display ?? leadGenDetailData.audit?.gpb_completeness_score ?? '-'}/100
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {leadGenDetailData.audit?.audit_results && Object.keys(leadGenDetailData.audit.audit_results).length > 0 && (
+                          <div>
+                            <p className="text-white/50 text-xs mb-1">Audit results</p>
+                            <pre className="text-xs text-white/70 bg-black/20 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+                              {JSON.stringify(leadGenDetailData.audit.audit_results, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Quality Score & Report */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

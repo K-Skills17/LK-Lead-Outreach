@@ -1257,6 +1257,9 @@ export function mergeLeadGenDataIntoContact(
           ? enr.marketing_tags
           : undefined;
     }
+    if (enr.email_validation !== undefined && enr.email_validation !== null) {
+      merged.email_validation = enr.email_validation;
+    }
     // All phone numbers as potential WhatsApp numbers (so they show as "with contact" not "without")
     const allPhonesFromEnr = [
       ...(Array.isArray(enr.all_phone_numbers) ? enr.all_phone_numbers : []),
@@ -1371,6 +1374,9 @@ export function mergeLeadGenDataIntoContact(
     if (gpbScore !== undefined && gpbScore !== null) {
       merged.gpb_completeness_score = gpbScore;
     }
+    // Use computed GPB when raw is 25 or missing (so 4.9 + 385 reviews don't show 25/100)
+    const displayGpb = computeDisplayGpbScore(merged);
+    if (displayGpb != null) merged.gpb_completeness_score = displayGpb;
     // Filter audit_results: skip known errors we don't use yet
     const skipErrorKeys = [
       'audit timeout',
