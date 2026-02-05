@@ -95,6 +95,50 @@ interface AIStrategySuggestion {
   category: 'personalization' | 'ab_testing' | 'send_time' | 'campaign_optimization' | 'lead_quality';
 }
 
+interface LeadGenIntelligence {
+  connected: boolean;
+  campaignStats: {
+    id?: string;
+    campaign_name?: string;
+    total_leads?: number;
+    enriched_leads?: number;
+    analyzed_leads?: number;
+    emails_sent?: number;
+    whatsapp_sent?: number;
+    avg_quality_score?: number;
+  }[];
+  channelPerformance: {
+    niche?: string;
+    channel?: string;
+    total_sent?: number;
+    total_opened?: number;
+    total_replied?: number;
+    open_rate?: number;
+    reply_rate?: number;
+  }[];
+  engagementScores: {
+    lead_id?: string;
+    business_name?: string;
+    quality_score?: number;
+    engagement_level?: string;
+    total_opens?: number;
+    total_replies?: number;
+  }[];
+  optimalSendTimes: {
+    niche?: string;
+    day_of_week?: number;
+    hour_of_day?: number;
+    send_count?: number;
+    open_rate_percent?: number;
+  }[];
+  recentActivity: {
+    type: string;
+    time: string;
+    business_name?: string;
+    details: Record<string, unknown>;
+  }[];
+}
+
 interface OverviewData {
   sdrs: SDR[];
   campaigns: Campaign[];
@@ -110,7 +154,10 @@ interface OverviewData {
     vipLeads?: number;
     hotLeads?: number;
     avgPersonalizationScore?: number;
+    icpMatches?: number;
+    qualityTierDistribution?: Record<string, number>;
   };
+  leadGenIntelligence?: LeadGenIntelligence;
 }
 
 export default function AdminDashboard() {
@@ -906,6 +953,185 @@ export default function AdminDashboard() {
               </div>
               <p className="text-sm font-medium text-white/90">Avg Personalization</p>
               <p className="text-xs text-white/70 mt-1">AI analysis quality score</p>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Gen Intelligence Panel */}
+        {data.leadGenIntelligence?.connected && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-br from-slate-800 via-emerald-900 to-slate-800 rounded-2xl shadow-2xl p-6 border border-emerald-500/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32" />
+
+              <div className="flex items-center justify-between mb-6 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <Shield className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Lead Gen Intelligence</h2>
+                    <p className="text-sm text-emerald-200">Direct database insights from Lead Gen Engine</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {data.stats.icpMatches !== undefined && data.stats.icpMatches > 0 && (
+                    <span className="px-3 py-1 bg-emerald-500/30 text-emerald-200 rounded-full text-xs font-semibold">
+                      {data.stats.icpMatches} ICP Matches
+                    </span>
+                  )}
+                  <span className="px-3 py-1 bg-emerald-500/30 text-emerald-200 rounded-full text-xs font-semibold">
+                    Connected
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+                {/* Quality Tier Distribution */}
+                {data.stats.qualityTierDistribution && Object.keys(data.stats.qualityTierDistribution).length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Lead Quality Tiers</h3>
+                    <div className="space-y-2">
+                      {Object.entries(data.stats.qualityTierDistribution)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([tier, count]) => (
+                          <div key={tier} className="flex items-center justify-between">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              tier === 'VIP' ? 'bg-purple-500/50 text-purple-100' :
+                              tier === 'HOT' ? 'bg-red-500/50 text-red-100' :
+                              tier === 'WARM' ? 'bg-orange-500/50 text-orange-100' :
+                              'bg-gray-500/50 text-gray-200'
+                            }`}>
+                              {tier}
+                            </span>
+                            <span className="text-white font-semibold">{count}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Channel Performance */}
+                {data.leadGenIntelligence.channelPerformance.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Channel Performance</h3>
+                    <div className="space-y-3">
+                      {data.leadGenIntelligence.channelPerformance.slice(0, 4).map((ch, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <div>
+                            <span className="text-emerald-200 font-medium capitalize">{ch.channel || 'N/A'}</span>
+                            {ch.niche && <span className="text-white/50 ml-1 text-xs">({ch.niche})</span>}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white font-semibold">{ch.total_sent || 0} sent</span>
+                            {ch.open_rate !== undefined && (
+                              <span className="text-emerald-300 ml-2 text-xs">{Math.round((ch.open_rate || 0) * 100)}% open</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Optimal Send Times */}
+                {data.leadGenIntelligence.optimalSendTimes.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Best Send Times</h3>
+                    <div className="space-y-2">
+                      {data.leadGenIntelligence.optimalSendTimes.slice(0, 5).map((st, i) => {
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const day = st.day_of_week !== undefined ? days[st.day_of_week] : '?';
+                        const hour = st.hour_of_day !== undefined ? `${st.hour_of_day}:00` : '?';
+                        return (
+                          <div key={i} className="flex items-center justify-between text-sm">
+                            <span className="text-emerald-200">
+                              {day} at {hour}
+                              {st.niche && <span className="text-white/50 ml-1 text-xs">({st.niche})</span>}
+                            </span>
+                            <span className="text-white font-semibold">
+                              {st.open_rate_percent !== undefined ? `${Math.round(st.open_rate_percent)}% open` : `${st.send_count || 0} sends`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hot Engagement Leads */}
+                {data.leadGenIntelligence.engagementScores.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Hot Engagement Leads</h3>
+                    <div className="space-y-2">
+                      {data.leadGenIntelligence.engagementScores.slice(0, 5).map((lead, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <div className="truncate flex-1 mr-2">
+                            <span className="text-white font-medium">{lead.business_name || 'Unknown'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {lead.quality_score !== undefined && (
+                              <span className="text-emerald-300 text-xs font-semibold">{lead.quality_score}/100</span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              lead.engagement_level === 'hot' ? 'bg-red-500/50 text-red-100' :
+                              lead.engagement_level === 'warm' ? 'bg-orange-500/50 text-orange-100' :
+                              'bg-gray-500/50 text-gray-200'
+                            }`}>
+                              {lead.engagement_level || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lead Gen Campaign Stats */}
+                {data.leadGenIntelligence.campaignStats.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Lead Gen Campaigns</h3>
+                    <div className="space-y-3">
+                      {data.leadGenIntelligence.campaignStats.slice(0, 4).map((cs, i) => (
+                        <div key={i} className="text-sm">
+                          <p className="text-white font-medium truncate">{cs.campaign_name || 'Campaign'}</p>
+                          <div className="flex gap-3 mt-1 text-xs">
+                            <span className="text-emerald-300">{cs.total_leads || 0} leads</span>
+                            <span className="text-blue-300">{cs.enriched_leads || 0} enriched</span>
+                            <span className="text-purple-300">{cs.emails_sent || 0} emails</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity Feed */}
+                {data.leadGenIntelligence.recentActivity.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+                    <h3 className="text-lg font-bold text-white mb-3">Recent Activity</h3>
+                    <div className="space-y-2">
+                      {data.leadGenIntelligence.recentActivity.slice(0, 6).map((act, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm">
+                          <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                            act.type === 'response_received' ? 'bg-green-400' :
+                            act.type === 'email_sent' ? 'bg-blue-400' :
+                            act.type === 'whatsapp_sent' ? 'bg-emerald-400' :
+                            'bg-yellow-400'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-white/80 text-xs">
+                              {act.type.replace(/_/g, ' ')}{act.business_name ? ` - ${act.business_name}` : ''}
+                            </span>
+                            <p className="text-white/40 text-xs">
+                              {new Date(act.time).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

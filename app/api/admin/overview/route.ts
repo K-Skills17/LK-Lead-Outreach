@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { getCompleteLeadGenData, mergeLeadGenDataIntoContact } from '@/lib/lead-gen-db-service';
+import {
+  getCompleteLeadGenData,
+  mergeLeadGenDataIntoContact,
+  isLeadGenDatabaseConfigured,
+  getCampaignStats,
+  getLeadEngagementScores,
+  getChannelPerformance,
+  getOptimalSendTimes,
+  getRecentActivity,
+} from '@/lib/lead-gen-db-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -210,8 +219,64 @@ export async function GET(request: NextRequest) {
     const hotLeads = enrichedLeads.filter((l: any) => l.personalization?.tier === 'HOT').length;
     const avgPersonalizationScore = enrichedLeads
       .filter((l: any) => l.personalization?.score)
-      .reduce((sum: number, l: any) => sum + (l.personalization?.score || 0), 0) / 
+      .reduce((sum: number, l: any) => sum + (l.personalization?.score || 0), 0) /
       Math.max(1, enrichedLeads.filter((l: any) => l.personalization?.score).length);
+
+    // Calculate Lead Gen quality tier distribution from enriched leads
+    const qualityTierDistribution: Record<string, number> = {};
+    const icpCount = enrichedLeads.filter((l: any) => l.is_icp).length;
+    enrichedLeads.forEach((l: any) => {
+      const tier = l.business_quality_tier;
+      if (tier) {
+        qualityTierDistribution[tier] = (qualityTierDistribution[tier] || 0) + 1;
+      }
+    });
+
+    // Fetch Lead Gen database intelligence (non-blocking)
+    let leadGenIntelligence: {
+      connected: boolean;
+      campaignStats: any[];
+      channelPerformance: any[];
+      engagementScores: any[];
+      optimalSendTimes: any[];
+      recentActivity: any[];
+    } = {
+      connected: false,
+      campaignStats: [],
+      channelPerformance: [],
+      engagementScores: [],
+      optimalSendTimes: [],
+      recentActivity: [],
+    };
+
+    if (isLeadGenDatabaseConfigured()) {
+      try {
+        const [
+          lgCampaignStats,
+          lgChannelPerf,
+          lgEngagement,
+          lgSendTimes,
+          lgActivity,
+        ] = await Promise.all([
+          getCampaignStats().catch(() => []),
+          getChannelPerformance().catch(() => []),
+          getLeadEngagementScores({ engagementLevel: 'hot', limit: 20 }).catch(() => []),
+          getOptimalSendTimes({ minSendCount: 5, limit: 10 }).catch(() => []),
+          getRecentActivity({ hours: 48, limit: 20 }).catch(() => []),
+        ]);
+
+        leadGenIntelligence = {
+          connected: true,
+          campaignStats: lgCampaignStats,
+          channelPerformance: lgChannelPerf,
+          engagementScores: lgEngagement,
+          optimalSendTimes: lgSendTimes,
+          recentActivity: lgActivity,
+        };
+      } catch (err) {
+        console.warn('[Admin Overview] Lead Gen intelligence fetch error:', err);
+      }
+    }
 
     return NextResponse.json({
       sdrs: sdrStats,
@@ -228,7 +293,10 @@ export async function GET(request: NextRequest) {
         vipLeads,
         hotLeads,
         avgPersonalizationScore: Math.round(avgPersonalizationScore) || 0,
+        icpMatches: icpCount,
+        qualityTierDistribution,
       },
+      leadGenIntelligence,
     });
   } catch (error) {
     console.error('[Admin Overview] Error:', error);
