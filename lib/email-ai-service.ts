@@ -7,9 +7,16 @@
 
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize so build can succeed without OPENAI_API_KEY (only required at runtime)
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error('Missing credentials. Set OPENAI_API_KEY environment variable.');
+    _openai = new OpenAI({ apiKey: key });
+  }
+  return _openai;
+}
 
 export interface EmailVariation {
   subject: string;
@@ -284,7 +291,7 @@ Return ONLY a valid JSON object with this exact structure:
   ]
 }`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {

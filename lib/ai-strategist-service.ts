@@ -6,10 +6,16 @@
 import OpenAI from 'openai';
 import { supabaseAdmin } from './supabaseAdmin';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI so build can succeed without OPENAI_API_KEY (only required at runtime)
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error('Missing credentials. Set OPENAI_API_KEY environment variable.');
+    _openai = new OpenAI({ apiKey: key });
+  }
+  return _openai;
+}
 
 export interface AIStrategySuggestion {
   title: string;
@@ -99,7 +105,7 @@ Return ONLY a valid JSON object with a "suggestions" array in this format:
   ]
 }`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4',
       messages: [
         {

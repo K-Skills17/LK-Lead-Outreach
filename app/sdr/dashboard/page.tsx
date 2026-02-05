@@ -2363,12 +2363,14 @@ export default function SDRDashboardPage() {
                               <p className="text-white/80"><span className="text-blue-300">Found on:</span> {leadGenDetailData.enrichment.found_on_page}</p>
                             )}
                             {leadGenDetailData.enrichment.email_validation && (
-                              <p className="text-white/80 mt-2"><span className="text-blue-300">Email validation:</span></p>
-                              <pre className="text-xs text-white/70 mt-0.5 bg-black/20 p-2 rounded overflow-x-auto max-h-20 overflow-y-auto">
-                                {typeof leadGenDetailData.enrichment.email_validation === 'object'
-                                  ? JSON.stringify(leadGenDetailData.enrichment.email_validation, null, 2)
-                                  : String(leadGenDetailData.enrichment.email_validation)}
-                              </pre>
+                              <>
+                                <p className="text-white/80 mt-2"><span className="text-blue-300">Email validation:</span></p>
+                                <pre className={"text-xs text-white/70 mt-0.5 bg-black/20 p-2 rounded overflow-x-auto max-h-20 overflow-y-auto"}>
+                                  {typeof leadGenDetailData.enrichment.email_validation === 'object'
+                                    ? JSON.stringify(leadGenDetailData.enrichment.email_validation, null, 2)
+                                    : String(leadGenDetailData.enrichment.email_validation)}
+                                </pre>
+                              </>
                             )}
                             {leadGenDetailData.enrichment.potential_whatsapp_numbers?.length > 0 && (
                               <p className="text-white/80 mt-2"><span className="text-blue-300">Potential WhatsApp:</span> {leadGenDetailData.enrichment.potential_whatsapp_numbers.join(', ')}</p>
@@ -2418,7 +2420,7 @@ export default function SDRDashboardPage() {
                         {leadGenDetailData.audit?.audit_results && Object.keys(leadGenDetailData.audit.audit_results).length > 0 && (
                           <div>
                             <p className="text-white/50 text-xs mb-1">Audit results</p>
-                            <pre className="text-xs text-white/70 bg-black/20 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+                            <pre className={"text-xs text-white/70 bg-black/20 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto"}>
                               {JSON.stringify(leadGenDetailData.audit.audit_results, null, 2)}
                             </pre>
                           </div>

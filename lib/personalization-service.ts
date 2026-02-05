@@ -8,10 +8,15 @@
 import OpenAI from 'openai';
 import { supabaseAdmin } from './supabaseAdmin';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error('Missing credentials. Set OPENAI_API_KEY environment variable.');
+    _openai = new OpenAI({ apiKey: key });
+  }
+  return _openai;
+}
 
 export type LeadTier = 'VIP' | 'HOT' | 'WARM' | 'COLD';
 
@@ -218,7 +223,7 @@ IMPORTANTE:
 Escreva APENAS a introdução (2-3 frases), sem saudação ou fechamento.`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4',
       messages: [
         {

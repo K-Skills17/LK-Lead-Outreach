@@ -7,9 +7,15 @@
 
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error('Missing credentials. Set OPENAI_API_KEY environment variable.');
+    _openai = new OpenAI({ apiKey: key });
+  }
+  return _openai;
+}
 
 interface LandingPageGenerationInput {
   leadName?: string;
@@ -105,7 +111,7 @@ Requirements:
 
 Return ONLY a single, detailed prompt (no JSON, no markdown, just the prompt text) that Leonardo AI can use to generate this landing page mockup. The prompt should be specific, descriptive, and include all relevant visual elements.`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
