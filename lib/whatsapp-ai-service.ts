@@ -246,6 +246,91 @@ function buildLeadContext(input: WhatsAppVariationInput): string {
 }
 
 /**
+ * Build template-based fallback variations using available lead data
+ */
+function buildFallbackVariations(
+  input: WhatsAppVariationInput
+): WhatsAppVariation[] {
+  const nome = input.nome || 'Cliente';
+  const empresa = input.empresa || 'sua empresa';
+  const sdrName = input.sdr_name || 'Equipe LK Digital';
+  const painPoint =
+    input.pain_points && input.pain_points.length > 0
+      ? input.pain_points[0]
+      : input.dor_especifica || 'presença digital';
+  const competitor =
+    input.competitors && input.competitors.length > 0
+      ? input.competitors[0].name
+      : null;
+  const competitorCount = input.competitor_count || input.competitors?.length;
+
+  // Deliverables
+  const deliverables: string[] = [];
+  if (input.pdf_report_url) deliverables.push('um relatório em PDF');
+  if (input.mockup_url) deliverables.push('um mockup de redesign');
+  if (input.landing_page_slug) deliverables.push('uma página personalizada');
+
+  // Pain point variation
+  let painMsg = `Olá ${nome}! 👋\n\nEstive analisando a ${empresa} e identifiquei um ponto importante: *${painPoint}*.`;
+  if (input.business_quality_score) {
+    painMsg += `\n\nNa nossa análise, a pontuação geral ficou em ${input.business_quality_score}/100 — o que significa que há bastante espaço para crescer.`;
+  }
+  if (competitor) {
+    painMsg += `\n\nNotei que ${competitor} já está investindo forte nessa área.`;
+  }
+  painMsg += `\n\nPosso te mostrar exatamente o que encontrei e como resolver isso?\n\n${sdrName}`;
+
+  // Curiosity variation
+  let curiosityMsg = `Olá ${nome}! 🔍\n\n`;
+  if (competitorCount && competitorCount > 0) {
+    curiosityMsg += `Você sabia que ${competitorCount} concorrentes na sua região já estão investindo em presença digital?`;
+  } else {
+    curiosityMsg += `Fiz uma pesquisa sobre a ${empresa} e encontrei algumas oportunidades que talvez você não conheça.`;
+  }
+  if (input.seo_score) {
+    curiosityMsg += `\n\nO SEO da ${empresa} está em ${input.seo_score}/100 — tem bastante potencial de melhoria.`;
+  }
+  if (input.rating) {
+    curiosityMsg += `\n\nVi que vocês têm ${input.rating}/5 de avaliação${input.reviews ? ` com ${input.reviews} reviews` : ''}.`;
+  }
+  curiosityMsg += `\n\nGostaria de compartilhar o que descobrimos?\n\n${sdrName}`;
+
+  // Value proposition variation
+  let valueMsg = `Olá ${nome}! 💼\n\nPreparei uma análise completa da ${empresa}`;
+  if (deliverables.length > 0) {
+    valueMsg += `, incluindo ${deliverables.join(' e ')}`;
+  }
+  valueMsg += `.\n\n`;
+  if (input.personalized_message) {
+    valueMsg += `${input.personalized_message.substring(0, 200)}\n\n`;
+  } else {
+    valueMsg += `Com base na análise, identifiquei oportunidades concretas para melhorar sua presença online e atrair mais clientes.\n\n`;
+  }
+  valueMsg += `Posso enviar o material para você dar uma olhada?\n\n${sdrName}`;
+
+  return [
+    {
+      id: 'pain_point',
+      name: 'Direct Pain Point',
+      description: 'Focuses on the main pain point with specific data',
+      message: painMsg,
+    },
+    {
+      id: 'curiosity_hook',
+      name: 'Curiosity Hook',
+      description: 'Opens with an intriguing insight about their business',
+      message: curiosityMsg,
+    },
+    {
+      id: 'value_offer',
+      name: 'Value Proposition',
+      description: 'Leads with concrete deliverables and results',
+      message: valueMsg,
+    },
+  ];
+}
+
+/**
  * Generate 3 WhatsApp message variations for a lead
  */
 export async function generateWhatsAppVariations(
@@ -255,18 +340,30 @@ export async function generateWhatsAppVariations(
   const enriched = await enrichWithLeadGenData(input);
   const leadGenDataUsed = enriched !== input;
 
-  const leadContext = buildLeadContext(enriched);
-
-  const toneMap: Record<string, string> = {
-    friendly: 'amigável e acolhedor',
-    professional: 'profissional e respeitoso',
-    casual: 'descontraído e informal',
-    formal: 'formal e educado',
-  };
-  const tone = enriched.tone || 'friendly';
   const sdrName = enriched.sdr_name || 'Equipe LK Digital';
 
-  const systemPrompt = `You are a High-Ticket B2B Sales Closer specialized in cold WhatsApp outreach.
+  // Check if OpenAI is available before attempting
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.warn('[WhatsApp AI] OPENAI_API_KEY not configured, using template variations');
+    return {
+      variations: buildFallbackVariations(enriched),
+      leadGenDataUsed,
+    };
+  }
+
+  try {
+    const leadContext = buildLeadContext(enriched);
+
+    const toneMap: Record<string, string> = {
+      friendly: 'amigável e acolhedor',
+      professional: 'profissional e respeitoso',
+      casual: 'descontraído e informal',
+      formal: 'formal e educado',
+    };
+    const tone = enriched.tone || 'friendly';
+
+    const systemPrompt = `You are a High-Ticket B2B Sales Closer specialized in cold WhatsApp outreach.
 You create RICH, PERSONALIZED, HIGHLY ENGAGING messages that start conversations.
 
 Rules:
@@ -307,7 +404,7 @@ You must return EXACTLY 3 variations in valid JSON format:
 
 IMPORTANT: Return ONLY the JSON, no markdown code blocks, no extra text.`;
 
-  const userPrompt = `Generate 3 WhatsApp message variations for this lead using ALL available intelligence:
+    const userPrompt = `Generate 3 WhatsApp message variations for this lead using ALL available intelligence:
 
 ${leadContext}
 
@@ -318,20 +415,19 @@ Each variation must be distinct in approach:
 
 Use discovered data (scores, competitors, marketing tech, pain points) to make each message feel deeply researched and personal.`;
 
-  const openai = getOpenAI();
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.85,
-    max_tokens: 2000,
-  });
+    const openai = getOpenAI();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.85,
+      max_tokens: 2000,
+    });
 
-  const raw = completion.choices[0]?.message?.content || '';
+    const raw = completion.choices[0]?.message?.content || '';
 
-  try {
     // Clean potential markdown wrapping
     const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(cleaned);
@@ -354,32 +450,20 @@ Use discovered data (scores, competitors, marketing tech, pain points) to make e
       return { variations, leadGenDataUsed };
     }
 
-    throw new Error('Invalid response structure');
-  } catch (parseError) {
-    console.error('[WhatsApp AI] Parse error, attempting fallback:', parseError);
+    // AI returned unexpected structure, fall back to templates
+    console.warn('[WhatsApp AI] Unexpected AI response structure, using fallback');
+    return {
+      variations: buildFallbackVariations(enriched),
+      leadGenDataUsed,
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[WhatsApp AI] Error generating variations:', errMsg);
 
-    // Fallback: extract messages from raw text
-    const fallbackVariations: WhatsAppVariation[] = [
-      {
-        id: 'pain_point',
-        name: 'Direct Pain Point',
-        description: 'Generated from raw response',
-        message: raw.substring(0, 600),
-      },
-      {
-        id: 'curiosity_hook',
-        name: 'Curiosity Hook',
-        description: 'Default template',
-        message: `Olá ${enriched.nome || 'Cliente'}! 👋\n\nEstive analisando a ${enriched.empresa || 'sua empresa'} e encontrei algumas oportunidades interessantes.\n\nVocê sabia que ${enriched.competitor_count || 'vários'} concorrentes na sua região já estão investindo em presença digital?\n\nGostaria de compartilhar o que descobrimos?\n\n${sdrName}`,
-      },
-      {
-        id: 'value_offer',
-        name: 'Value Proposition',
-        description: 'Default template',
-        message: `Olá ${enriched.nome || 'Cliente'}! 💼\n\nPreparei uma análise completa da ${enriched.empresa || 'sua empresa'} com insights sobre como melhorar sua presença online.\n\nPosso enviar o relatório para você dar uma olhada?\n\n${sdrName}`,
-      },
-    ];
-
-    return { variations: fallbackVariations, leadGenDataUsed };
+    // Return template-based variations instead of throwing
+    return {
+      variations: buildFallbackVariations(enriched),
+      leadGenDataUsed,
+    };
   }
 }

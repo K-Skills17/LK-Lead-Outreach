@@ -120,17 +120,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[SDR WhatsApp Variations] Error:', error);
-
-    if (error instanceof Error && error.message.includes('OPENAI_API_KEY')) {
-      return NextResponse.json(
-        { error: 'AI service not configured' },
-        { status: 503 }
-      );
-    }
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[SDR WhatsApp Variations] Error:', errMsg, error);
 
     return NextResponse.json(
-      { error: 'Failed to generate variations' },
+      {
+        error: 'Failed to generate variations',
+        detail: errMsg,
+      },
       { status: 500 }
     );
   }
