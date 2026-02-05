@@ -6,9 +6,15 @@
 
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openaiInstance: OpenAI | null = null;
+
+function getOpenAI(): OpenAI | null {
+  if (openaiInstance) return openaiInstance;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  openaiInstance = new OpenAI({ apiKey });
+  return openaiInstance;
+}
 
 interface LeonardoImageGenerationInput {
   leadName?: string;
@@ -40,8 +46,13 @@ async function generateLeonardoPrompt(
   input: LeonardoImageGenerationInput
 ): Promise<{ success: boolean; prompt?: string; error?: string }> {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return { success: false, error: 'OPENAI_API_KEY not configured' };
+    const openai = getOpenAI();
+    if (!openai) {
+      return { success: false, error: 'OPENAI_API_KEY not configured. Set the OPENAI_API_KEY environment variable.' };
+    }
+
+    if (!process.env.LEONARDO_API_KEY) {
+      return { success: false, error: 'LEONARDO_API_KEY not configured. Set the LEONARDO_API_KEY environment variable.' };
     }
 
     const prompt = `You are an expert at creating prompts for professional business analysis infographics. Generate a detailed, specific prompt for Leonardo AI to create a personalized visual analysis image.

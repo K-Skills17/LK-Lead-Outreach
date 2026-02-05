@@ -220,13 +220,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('[GenerateImage] Error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[GenerateImage] Error:', errMsg, error);
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : String(error))
-          : undefined,
+        details: errMsg,
       },
       { status: 500 }
     );
