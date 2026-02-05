@@ -2232,6 +2232,88 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
+                  {/* Enrichment: has_contact_page, has_booking_system, marketing_tags, potential WhatsApp */}
+                  {((selectedLead as any).has_contact_page !== undefined || (selectedLead as any).has_booking_system !== undefined || (selectedLead as any).marketing_tags || (selectedLead as any).potential_whatsapp_numbers?.length) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📋 Enrichment (Contact / Booking / Tags)</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {(selectedLead as any).has_contact_page !== undefined && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            Has contact page: {(selectedLead as any).has_contact_page ? 'Yes' : 'No'}
+                          </span>
+                        )}
+                        {(selectedLead as any).has_booking_system !== undefined && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            Has booking system: {(selectedLead as any).has_booking_system ? 'Yes' : 'No'}
+                          </span>
+                        )}
+                      </div>
+                      {(selectedLead as any).marketing_tags && (
+                        <div className="mb-2">
+                          <span className="text-gray-600 font-medium text-xs">Marketing tags: </span>
+                          <span className="text-gray-700 text-sm">
+                            {typeof (selectedLead as any).marketing_tags === 'object' && !Array.isArray((selectedLead as any).marketing_tags)
+                              ? Object.entries((selectedLead as any).marketing_tags).filter(([, v]) => v).map(([k]) => k).join(', ')
+                              : Array.isArray((selectedLead as any).marketing_tags)
+                                ? (selectedLead as any).marketing_tags.join(', ')
+                                : String((selectedLead as any).marketing_tags)}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedLead as any).potential_whatsapp_numbers && (selectedLead as any).potential_whatsapp_numbers.length > 0 && (
+                        <div>
+                          <span className="text-gray-600 font-medium text-xs">Potential WhatsApp numbers: </span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(selectedLead as any).potential_whatsapp_numbers.map((p: string, i: number) => (
+                              <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">{p}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Audit: rating, review_count, gpb_completeness_score, audit_results */}
+                  {((selectedLead as any).gpb_completeness_score != null || (selectedLead as any).audit_results || (selectedLead as any).rating != null || (selectedLead as any).reviews != null) && (
+                    <div className="bg-white/80 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-gray-500 mb-3 font-semibold">📊 Audit & GPB</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        {(selectedLead as any).rating != null && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Rating</p>
+                            <p className="text-lg font-bold text-gray-900">⭐ {(selectedLead as any).rating}/5</p>
+                          </div>
+                        )}
+                        {(selectedLead as any).reviews != null && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Reviews</p>
+                            <p className="text-lg font-bold text-gray-900">{(selectedLead as any).reviews}</p>
+                          </div>
+                        )}
+                        {((selectedLead as any).gpb_completeness_score != null || (selectedLead as any).rating != null) && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">GPB completeness</p>
+                            <p className="text-lg font-bold text-gray-900">
+                              {(selectedLead as any).gpb_completeness_score != null && (selectedLead as any).gpb_completeness_score !== 25
+                                ? `${(selectedLead as any).gpb_completeness_score}/100`
+                                : (selectedLead as any).rating != null && ((selectedLead as any).reviews > 0 || (selectedLead as any).rating > 0)
+                                  ? `${Math.round(Math.min(100, (selectedLead as any).rating / 5 * 40 + Math.min(60, ((selectedLead as any).reviews || 0) / 6.5)))}/100 (computed)`
+                                  : (selectedLead as any).gpb_completeness_score != null ? `${(selectedLead as any).gpb_completeness_score}/100` : '-'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {(selectedLead as any).audit_results && Object.keys((selectedLead as any).audit_results).length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2 font-semibold">Audit results</p>
+                          <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                            {JSON.stringify((selectedLead as any).audit_results, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Enrichment Data */}
                   {((selectedLead as any).all_emails || (selectedLead as any).contact_names || (selectedLead as any).whatsapp_phone || (selectedLead as any).site) && (
                     <div className="bg-white/80 rounded-xl p-4">

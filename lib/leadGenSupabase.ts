@@ -332,11 +332,15 @@ export interface LeadGenEnrichment {
   emails?: string[];
   best_email?: string;
   whatsapp_phone?: Record<string, any>;
+  /** All phone numbers found (potential WhatsApp numbers) */
+  all_phone_numbers?: string[];
+  phone_numbers?: string[];
   contact_name?: string;
   found_on_page?: string;
   has_contact_page?: boolean;
   has_booking_system?: boolean;
   marketing_tags?: Record<string, any>;
+  email_validation?: Record<string, any>;
   created_at?: string;
 }
 
@@ -499,11 +503,20 @@ export interface LeadGenOutreachSync {
 
 export interface LeadGenAudit {
   id: string;
+  lead_id?: string;
   clinic_name: string;
   clinic_location: string;
   website_url?: string;
   instagram_handle?: string;
   status?: 'pending' | 'processing' | 'completed' | 'failed';
+  /** Google rating (may be in audit_results or top-level) */
+  rating?: number;
+  /** Review count (may be in audit_results or top-level) */
+  review_count?: number;
+  /** GPB completeness score 0-100 (may be in audit_results or top-level) */
+  gpb_completeness_score?: number;
+  gpb_completeness_Score?: number;
+  /** Full audit payload (JSONB); may contain rating, review_count, errors, etc. */
   audit_results?: Record<string, any>;
   created_at?: string;
   completed_at?: string;

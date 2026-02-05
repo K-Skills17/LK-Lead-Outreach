@@ -59,6 +59,7 @@ export async function GET(
         report: leadGenData.report,
         landingPage: leadGenData.landingPage,
         qualityScore: leadGenData.qualityScore,
+        audit: leadGenData.audit,
       },
     });
   } catch (error) {

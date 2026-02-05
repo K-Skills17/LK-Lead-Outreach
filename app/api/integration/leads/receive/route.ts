@@ -604,12 +604,20 @@ export async function POST(request: NextRequest) {
         
         // Extract enrichment metadata
         const allEmails = enrichmentDataObj.emails || leadInfo.emails || validated.all_emails || null;
-        const whatsappPhone = enrichmentDataObj.whatsapp_phone?.number || validated.whatsapp || leadInfo.whatsapp_sequence_step ? normalizedPhone : null;
+        const enrWhatsappNum = enrichmentDataObj.whatsapp_phone?.number || (typeof enrichmentDataObj.whatsapp_phone === 'string' ? enrichmentDataObj.whatsapp_phone : null);
+        const whatsappPhone = enrWhatsappNum || validated.whatsapp || (leadInfo.whatsapp_sequence_step ? normalizedPhone : null) || normalizedPhone;
         const whatsappStatus = enrichmentDataObj.whatsapp_phone?.verified ? 'verified' : leadInfo.whatsapp_status || null;
         const contactNames = enrichmentDataObj.contact_name ? [enrichmentDataObj.contact_name] : validated.contact_names || null;
         const hasContactPage = enrichmentDataObj.has_contact_page || null;
         const hasBookingSystem = enrichmentDataObj.has_booking_system || null;
         const foundOnPage = enrichmentDataObj.found_on_page || null;
+        const allPhonesFromEnr = [
+          ...(Array.isArray(enrichmentDataObj.all_phone_numbers) ? enrichmentDataObj.all_phone_numbers : []),
+          ...(Array.isArray(enrichmentDataObj.phone_numbers) ? enrichmentDataObj.phone_numbers : []),
+          ...(enrWhatsappNum ? [enrWhatsappNum] : []),
+          normalizedPhone,
+        ].filter(Boolean);
+        const potentialWhatsappNumbers = [...new Set(allPhonesFromEnr)].length > 0 ? [...new Set(allPhonesFromEnr)] : null;
         
         // Extract marketing tags (can be object or array)
         let marketingTags: string[] | null = null;
@@ -739,6 +747,8 @@ export async function POST(request: NextRequest) {
           has_contact_page: hasContactPage,
           has_booking_system: hasBookingSystem,
           found_on_page: foundOnPage,
+          potential_whatsapp_numbers: potentialWhatsappNumbers,
+          marketing_tags: marketingTags,
           
           // Legacy fields (for backward compatibility)
           industry: businessType || validated.industry || null,

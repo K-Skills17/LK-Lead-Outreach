@@ -41,6 +41,7 @@ import type {
   LeadGenCalendarBooking,
   LeadGenOutreachSync,
   LeadGenLandingPage,
+  LeadGenAudit,
   CampaignStatsView,
   LeadEngagementScoreView,
   ChannelPerformanceView,
@@ -74,6 +75,7 @@ export type {
   LeadGenCalendarBooking,
   LeadGenOutreachSync,
   LeadGenLandingPage,
+  LeadGenAudit,
   CampaignStatsView,
   LeadEngagementScoreView,
   ChannelPerformanceView,
@@ -102,6 +104,7 @@ export interface CompleteLeadGenData {
   responses: LeadGenResponse[];
   conversions: LeadGenConversion[];
   calendarBookings: LeadGenCalendarBooking[];
+  audit: LeadGenAudit | null;
 }
 
 // ==========================================
@@ -150,6 +153,7 @@ export async function getCompleteLeadGenData(leadId: string): Promise<CompleteLe
       responsesResult,
       conversionsResult,
       bookingsResult,
+      auditByLeadIdResult,
     ] = await Promise.all([
       // Campaign
       lead.campaign_id
@@ -179,7 +183,24 @@ export async function getCompleteLeadGenData(leadId: string): Promise<CompleteLe
       leadGenSupabase.from('conversions').select('*').eq('lead_id', leadId).order('converted_at', { ascending: false }),
       // Calendar bookings (1:many)
       leadGenSupabase.from('calendar_bookings').select('*').eq('lead_id', leadId).order('booked_at', { ascending: false }),
+      Promise.resolve({ data: null, error: null }), // audits fetched separately (table may not have lead_id)
     ]);
+
+    // Fetch audits (table may have lead_id or be keyed by website_url)
+    let audit: LeadGenAudit | null = null;
+    try {
+      const byLeadId = await leadGenSupabase.from('audits').select('*').eq('lead_id', leadId).order('completed_at', { ascending: false }).limit(1).maybeSingle();
+      audit = (byLeadId.data as LeadGenAudit | null) || null;
+      if (!audit && (lead.website || lead.domain)) {
+        const website = (lead.website || lead.domain || '').replace(/^https?:\/\//i, '').replace(/\/$/, '').split('/')[0];
+        if (website) {
+          const auditByWebsite = await leadGenSupabase.from('audits').select('*').ilike('website_url', `%${website}%`).order('completed_at', { ascending: false }).limit(1).maybeSingle();
+          if (auditByWebsite.data) audit = auditByWebsite.data as LeadGenAudit;
+        }
+      }
+    } catch {
+      // audits table may not exist or have different schema
+    }
 
     return {
       lead: lead as LeadGenLead,
@@ -196,6 +217,7 @@ export async function getCompleteLeadGenData(leadId: string): Promise<CompleteLe
       responses: (responsesResult.data || []) as LeadGenResponse[],
       conversions: (conversionsResult.data || []) as LeadGenConversion[],
       calendarBookings: (bookingsResult.data || []) as LeadGenCalendarBooking[],
+      audit,
     };
   } catch (error) {
     console.error('[LeadGenDB] Error getting complete lead data:', error);
@@ -1213,11 +1235,12 @@ export function mergeLeadGenDataIntoContact(
       merged.all_emails = enr.emails;
     }
     if (!merged.email && enr.best_email) merged.email = enr.best_email;
-    if (!merged.whatsapp_phone && enr.whatsapp_phone) {
-      merged.whatsapp_phone =
-        typeof enr.whatsapp_phone === 'string'
-          ? enr.whatsapp_phone
-          : enr.whatsapp_phone?.number;
+    const enrWhatsappNumber =
+      typeof enr.whatsapp_phone === 'string'
+        ? enr.whatsapp_phone
+        : enr.whatsapp_phone?.number;
+    if (!merged.whatsapp_phone && enrWhatsappNumber) {
+      merged.whatsapp_phone = enrWhatsappNumber;
     }
     if (!merged.contact_names && enr.contact_name) {
       merged.contact_names = [enr.contact_name];
@@ -1227,7 +1250,42 @@ export function mergeLeadGenDataIntoContact(
     if (enr.has_booking_system !== undefined)
       merged.has_booking_system = enr.has_booking_system;
     if (enr.found_on_page) merged.found_on_page = enr.found_on_page;
+    if (enr.marketing_tags !== undefined && enr.marketing_tags !== null) {
+      merged.marketing_tags = Array.isArray(enr.marketing_tags)
+        ? enr.marketing_tags
+        : typeof enr.marketing_tags === 'object'
+          ? enr.marketing_tags
+          : undefined;
+    }
+    // All phone numbers as potential WhatsApp numbers (so they show as "with contact" not "without")
+    const allPhonesFromEnr = [
+      ...(Array.isArray(enr.all_phone_numbers) ? enr.all_phone_numbers : []),
+      ...(Array.isArray(enr.phone_numbers) ? enr.phone_numbers : []),
+      ...(enrWhatsappNumber ? [enrWhatsappNumber] : []),
+    ].filter(Boolean);
+    if (allPhonesFromEnr.length > 0) {
+      merged.potential_whatsapp_numbers = [...new Set(allPhonesFromEnr)];
+      if (!merged.whatsapp_phone && merged.potential_whatsapp_numbers[0]) {
+        merged.whatsapp_phone = merged.potential_whatsapp_numbers[0];
+      }
+    }
   }
+
+  // Ensure contact/lead phone is treated as WhatsApp when we have no explicit whatsapp_phone
+  const leadPhone = leadGenData.lead?.phone;
+  const contactPhone = merged.phone || contact?.phone;
+  const phones = [
+    merged.whatsapp_phone,
+    contactPhone,
+    leadPhone,
+    ...(merged.potential_whatsapp_numbers || []),
+  ].filter(Boolean);
+  merged.potential_whatsapp_numbers = [...new Set(phones)];
+  if (!merged.whatsapp_phone && contactPhone) merged.whatsapp_phone = contactPhone;
+  if (!merged.whatsapp_phone && leadPhone) merged.whatsapp_phone = leadPhone;
+  // So "with contact" shows correctly: set phone from WhatsApp when contact has no phone
+  if (!merged.phone && merged.whatsapp_phone) merged.phone = merged.whatsapp_phone;
+  if (!merged.phone && merged.potential_whatsapp_numbers?.[0]) merged.phone = merged.potential_whatsapp_numbers[0];
 
   if (leadGenData.analysis) {
     const an = leadGenData.analysis;
@@ -1291,5 +1349,72 @@ export function mergeLeadGenDataIntoContact(
     if (!merged.is_icp && qs.is_icp !== undefined) merged.is_icp = qs.is_icp;
   }
 
+  // Audit data (rating, review_count, gpb_completeness_score, audit_results)
+  if (leadGenData.audit) {
+    const aud = leadGenData.audit;
+    const results = aud.audit_results || {};
+    const rating =
+      aud.rating ??
+      (typeof results.rating === 'number' ? results.rating : undefined) ??
+      (typeof results.rating === 'string' ? parseFloat(results.rating) : undefined);
+    const reviewCount =
+      aud.review_count ??
+      (typeof results.review_count === 'number' ? results.review_count : undefined) ??
+      (typeof results.reviews === 'number' ? results.reviews : undefined);
+    const gpbScore =
+      aud.gpb_completeness_score ??
+      aud.gpb_completeness_Score ??
+      (typeof results.gpb_completeness_score === 'number' ? results.gpb_completeness_score : undefined) ??
+      (typeof results.gpb_completeness_Score === 'number' ? results.gpb_completeness_Score : undefined);
+    if (rating !== undefined && rating !== null) merged.rating = merged.rating ?? rating;
+    if (reviewCount !== undefined && reviewCount !== null) merged.reviews = merged.reviews ?? reviewCount;
+    if (gpbScore !== undefined && gpbScore !== null) {
+      merged.gpb_completeness_score = gpbScore;
+    }
+    // Filter audit_results: skip known errors we don't use yet
+    const skipErrorKeys = [
+      'audit timeout',
+      'audit_timeout',
+      'error to find estimated monthly loss',
+      'estimated_monthly_loss',
+      'estimatedMonthlyLoss',
+    ];
+    const filterAuditResults = (obj: Record<string, any>): Record<string, any> => {
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const lower = String(k).toLowerCase();
+        const skip = skipErrorKeys.some(
+          (err) => lower.includes(err.toLowerCase().replace(/\s/g, '_')) || lower.includes(err.toLowerCase())
+        );
+        if (skip) continue;
+        if (v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
+          out[k] = filterAuditResults(v as Record<string, any>);
+        } else {
+          out[k] = v;
+        }
+      }
+      return out;
+    };
+    if (results && Object.keys(results).length > 0) {
+      merged.audit_results = filterAuditResults(results);
+    }
+  }
+
   return merged;
+}
+
+/** Compute display GPB score when raw is missing or always 25 (e.g. from rating + review_count) */
+export function computeDisplayGpbScore(merged: {
+  gpb_completeness_score?: number | null;
+  rating?: number | null;
+  reviews?: number | null;
+}): number | null {
+  const raw = merged.gpb_completeness_score;
+  const rating = merged.rating;
+  const reviews = merged.reviews ?? 0;
+  if (raw != null && raw !== 25) return raw;
+  if (rating != null && (reviews > 0 || rating > 0)) {
+    return Math.round(Math.min(100, (rating / 5) * 40 + Math.min(60, reviews / 6.5)));
+  }
+  return raw ?? null;
 }
