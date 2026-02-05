@@ -28,6 +28,9 @@ import {
   Square,
   Send,
   BarChart3,
+  Shield,
+  TrendingDown,
+  Zap,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -44,6 +47,9 @@ interface DashboardStats {
   pendingLeads: number;
   sentLeads: number;
   unreadReplies: number;
+  icpMatches?: number;
+  avgQualityScore?: number;
+  qualityTierDistribution?: Record<string, number>;
 }
 
 interface Campaign {
@@ -121,6 +127,12 @@ export default function SDRDashboardPage() {
   const [loadingSending, setLoadingSending] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetail, setShowLeadDetail] = useState(false);
+  const [leadGenIntelligence, setLeadGenIntelligence] = useState<{
+    connected: boolean;
+    engagementScores: any[];
+    optimalSendTimes: any[];
+    recentActivity: any[];
+  } | null>(null);
 
   useEffect(() => {
     // Check authentication
@@ -199,6 +211,10 @@ export default function SDRDashboardPage() {
 
       if (data.unreadReplies) {
         setReplies(data.unreadReplies);
+      }
+
+      if (data.leadGenIntelligence) {
+        setLeadGenIntelligence(data.leadGenIntelligence);
       }
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -659,6 +675,136 @@ export default function SDRDashboardPage() {
                 <span className="text-2xl font-bold text-gray-900">{stats.unreadReplies}</span>
               </div>
               <p className="text-sm text-gray-600">Unread Replies</p>
+            </div>
+          </div>
+        )}
+
+        {/* Lead Gen Quality Stats */}
+        {stats && (stats.icpMatches !== undefined && stats.icpMatches > 0 || stats.avgQualityScore !== undefined && stats.avgQualityScore > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <Shield className="w-8 h-8 text-white/80" />
+                <span className="text-2xl font-bold">{stats.icpMatches || 0}</span>
+              </div>
+              <p className="text-sm text-white/90 font-medium">ICP Matches</p>
+              <p className="text-xs text-white/60 mt-1">Ideal customer profile leads</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <BarChart3 className="w-8 h-8 text-white/80" />
+                <span className="text-2xl font-bold">{stats.avgQualityScore || 0}/100</span>
+              </div>
+              <p className="text-sm text-white/90 font-medium">Avg Quality Score</p>
+              <p className="text-xs text-white/60 mt-1">Lead Gen quality analysis</p>
+            </div>
+
+            {stats.qualityTierDistribution && Object.keys(stats.qualityTierDistribution).length > 0 && (
+              <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-lg p-6 text-white">
+                <div className="flex items-center justify-between mb-2">
+                  <Zap className="w-8 h-8 text-white/80" />
+                  <div className="text-right">
+                    {Object.entries(stats.qualityTierDistribution)
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 3)
+                      .map(([tier, count]) => (
+                        <span key={tier} className={`inline-block ml-1 px-2 py-0.5 rounded text-xs font-semibold ${
+                          tier === 'VIP' ? 'bg-purple-500/50' :
+                          tier === 'HOT' ? 'bg-red-500/50' :
+                          tier === 'WARM' ? 'bg-orange-500/50' :
+                          'bg-gray-500/50'
+                        }`}>
+                          {tier}: {count}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <p className="text-sm text-white/90 font-medium">Quality Tiers</p>
+                <p className="text-xs text-white/60 mt-1">Lead tier distribution</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lead Gen Intelligence Panel */}
+        {leadGenIntelligence?.connected && (
+          <div className="mb-6">
+            <div className="bg-gradient-to-br from-slate-800 via-emerald-900 to-slate-800 rounded-2xl shadow-xl p-5 border border-emerald-500/20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Lead Gen Intelligence</h2>
+                  <p className="text-xs text-emerald-200">Real-time insights from Lead Gen Engine</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Optimal Send Times */}
+                {leadGenIntelligence.optimalSendTimes.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                    <h3 className="text-sm font-bold text-white mb-2">Best Send Times</h3>
+                    <div className="space-y-1.5">
+                      {leadGenIntelligence.optimalSendTimes.slice(0, 4).map((st: any, i: number) => {
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const day = st.day_of_week !== undefined ? days[st.day_of_week] : '?';
+                        const hour = st.hour_of_day !== undefined ? `${st.hour_of_day}:00` : '?';
+                        return (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="text-emerald-200">{day} at {hour}</span>
+                            <span className="text-white font-semibold">
+                              {st.open_rate_percent !== undefined ? `${Math.round(st.open_rate_percent)}% open` : `${st.send_count || 0} sends`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hot Engagement Leads */}
+                {leadGenIntelligence.engagementScores.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                    <h3 className="text-sm font-bold text-white mb-2">Hot Leads</h3>
+                    <div className="space-y-1.5">
+                      {leadGenIntelligence.engagementScores.slice(0, 5).map((lead: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-white truncate flex-1 mr-2">{lead.business_name || 'Unknown'}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
+                            lead.engagement_level === 'hot' ? 'bg-red-500/50 text-red-100' :
+                            'bg-orange-500/50 text-orange-100'
+                          }`}>
+                            {lead.quality_score || 0}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity */}
+                {leadGenIntelligence.recentActivity.length > 0 && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                    <h3 className="text-sm font-bold text-white mb-2">Recent Activity</h3>
+                    <div className="space-y-1.5">
+                      {leadGenIntelligence.recentActivity.slice(0, 5).map((act: any, i: number) => (
+                        <div key={i} className="flex items-start gap-1.5 text-xs">
+                          <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            act.type === 'response_received' ? 'bg-green-400' :
+                            act.type === 'email_sent' ? 'bg-blue-400' :
+                            'bg-emerald-400'
+                          }`} />
+                          <span className="text-white/70 truncate">
+                            {act.type.replace(/_/g, ' ')}{act.business_name ? ` - ${act.business_name}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
