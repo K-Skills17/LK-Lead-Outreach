@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sendWhatsAppMessage } from '@/lib/whatsapp-sending-service';
+import { enqueueWhatsAppSend } from '@/lib/whatsapp-queue-service';
 import { z } from 'zod';
 import { getSDRById } from '@/lib/sdr-auth';
 
@@ -60,41 +60,33 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = sendWhatsAppSchema.parse(body);
 
-    // Send WhatsApp message
-    const result = await sendWhatsAppMessage({
+    // Enqueue for automatic delivery by the WhatsApp worker (human-like delays and breaks)
+    const result = await enqueueWhatsAppSend({
       contactId: validated.contactId,
-      sdrId,
-      messageText: validated.messageText || '',
-      skipChecks: validated.skipChecks || isAdmin, // Admin can skip checks for manual sends
-      includeImages: validated.includeImages !== false, // Include images by default
+      sdrId: sdrId ?? undefined,
+      messageText: validated.messageText ?? '',
+      includeImages: validated.includeImages !== false,
+      sentBySystem: validated.skipChecks !== true && !isAdmin,
     });
 
     if (!result.success) {
-      if (result.skipped) {
-        return NextResponse.json(
-          {
-            success: false,
-            skipped: true,
-            reason: result.skipReason,
-          },
-          { status: 200 } // 200 because it's a valid response (just skipped)
-        );
-      }
-
+      const isNotFound = result.error === 'Contact not found' || result.error === 'Contact has no phone number';
       return NextResponse.json(
         {
           success: false,
           error: result.error,
+          contactId: validated.contactId,
         },
-        { status: 500 }
+        { status: isNotFound ? 404 : 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      whatsappSendId: result.whatsappSendId,
-      contactId: result.contactId,
-      message: 'WhatsApp message sent successfully',
+      queued: true,
+      queueId: result.queueId,
+      contactId: validated.contactId,
+      message: 'Message queued for delivery. Run the WhatsApp worker (npm run whatsapp-worker) to send with human-like delays and breaks.',
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -56,6 +56,7 @@ export {
   leadGenSupabase,
   isLeadGenDatabaseConfigured,
   testLeadGenConnection,
+  getLeadGenTableAccess,
 };
 
 // Re-export types
@@ -84,6 +85,82 @@ export type {
   ABTestPerformanceView,
   LeadGenSalesPerformanceView,
 };
+
+// ==========================================
+// Lead Gen Table Access Diagnostic
+// ==========================================
+
+/**
+ * Check read access to Lead Gen tables (for diagnosing "no matching data").
+ * Returns per-table status: accessible, count (if available), or error message.
+ */
+export async function getLeadGenTableAccess(): Promise<{
+  configured: boolean;
+  connectionSuccess: boolean;
+  connectionMessage: string;
+  tables: { table: string; accessible: boolean; count?: number; error?: string }[];
+}> {
+  const tablesToCheck = [
+    'campaigns',
+    'leads',
+    'enrichment',
+    'analysis',
+    'audits',
+    'reports',
+    'competitor_analysis',
+    'lead_quality_scores',
+    'outreach',
+    'whatsapp_outreach',
+    'lead_responses',
+    'conversions',
+    'calendar_bookings',
+    'lead_outreach_sync',
+    'analysis_landing_pages',
+  ];
+
+  const result = {
+    configured: isLeadGenDatabaseConfigured(),
+    connectionSuccess: false,
+    connectionMessage: '',
+    tables: [] as { table: string; accessible: boolean; count?: number; error?: string }[],
+  };
+
+  if (!result.configured) {
+    result.connectionMessage = 'LEAD_GEN_SUPABASE_SERVICE_ROLE_KEY is not set.';
+    result.tables = tablesToCheck.map((t) => ({ table: t, accessible: false, error: 'Not configured' }));
+    return result;
+  }
+
+  const conn = await testLeadGenConnection();
+  result.connectionSuccess = conn.success;
+  result.connectionMessage = conn.message;
+
+  if (!conn.success) {
+    result.tables = tablesToCheck.map((t) => ({ table: t, accessible: false, error: conn.message }));
+    return result;
+  }
+
+  for (const table of tablesToCheck) {
+    try {
+      const { count, error } = await leadGenSupabase
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+      if (error) {
+        result.tables.push({ table, accessible: false, error: error.message });
+      } else {
+        result.tables.push({ table, accessible: true, count: count ?? 0 });
+      }
+    } catch (e) {
+      result.tables.push({
+        table,
+        accessible: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  return result;
+}
 
 // ==========================================
 // Complete Lead Data Interface

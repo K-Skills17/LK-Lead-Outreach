@@ -60,6 +60,7 @@ export async function sendWhatsAppMessage(
       .single();
 
     if (contactError || !contact) {
+      console.warn('[WhatsApp Send] Contact not found:', contactId, contactError?.message);
       return {
         success: false,
         error: 'Contact not found',

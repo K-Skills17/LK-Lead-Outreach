@@ -255,7 +255,7 @@ const enrichedLeadSchema = z.object({
  * This endpoint:
  * 1. Receives enriched lead data
  * 2. Creates/updates lead in database
- * 3. Sends initial email (if requested)
+ * 3. Sends initial email only if ENABLE_EMAIL_ON_LEAD_RECEIVE=true (off by default)
  * 4. Queues for WhatsApp follow-up
  * 
  * Authentication: Bearer token (shared secret)
@@ -953,8 +953,9 @@ export async function POST(request: NextRequest) {
         
         // ===== END NEW FEATURES INTEGRATION =====
 
-        // Send email if requested
-        if (validated.send_email_first && validated.email) {
+        // Send email on lead receive only if explicitly enabled (off by default to avoid unexpected sends)
+        const emailOnReceiveEnabled = process.env.ENABLE_EMAIL_ON_LEAD_RECEIVE === 'true';
+        if (emailOnReceiveEnabled && validated.send_email_first && validated.email) {
           try {
             await sendEmail({
               to: validated.email,

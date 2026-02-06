@@ -33,6 +33,8 @@ import {
   Zap,
   Edit2,
   RefreshCw,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { SimpleNavbar } from '@/components/ui/navbar';
 
@@ -94,6 +96,31 @@ interface Reply {
   };
 }
 
+/** Format an object as readable key-value text (no raw JSON) */
+function formatObjectAsText(obj: unknown): string {
+  if (obj == null) return '';
+  if (typeof obj !== 'object') return String(obj);
+  if (Array.isArray(obj)) return obj.map((v, i) => `${i + 1}. ${formatObjectAsText(v)}`).join('\n');
+  const entries = Object.entries(obj);
+  if (entries.length === 0) return '';
+  return entries
+    .map(([k, v]) => {
+      const label = k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      if (v != null && typeof v === 'object' && !Array.isArray(v)) return `${label}:\n${formatObjectAsText(v).replace(/^/gm, '  ')}`;
+      return `${label}: ${v === null || v === undefined ? '' : String(v)}`;
+    })
+    .join('\n');
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function SDRDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<SDRUser | null>(null);
@@ -151,6 +178,7 @@ export default function SDRDashboardPage() {
   const [editingQueueId, setEditingQueueId] = useState<string | null>(null);
   const [editingQueueMessage, setEditingQueueMessage] = useState('');
   const [savingQueueMessage, setSavingQueueMessage] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check authentication
@@ -1254,13 +1282,18 @@ export default function SDRDashboardPage() {
                                         const result = await response.json();
                                         
                                         if (response.ok && result.success) {
-                                          alert('✅ Photo sent via WhatsApp!');
+                                          alert(result.queued
+                                            ? '✅ Message queued for delivery. Run the WhatsApp worker (npm run whatsapp-worker) to send with human-like delays.'
+                                            : '✅ Photo sent via WhatsApp!');
                                           const token = sdrToken || localStorage.getItem('sdr_token');
                                           if (token) {
                                             loadDashboardData(token);
                                           }
                                         } else {
-                                          alert(`❌ ${result.error || result.reason || 'Failed to send photo'}`);
+                                          const msg = result.error === 'Contact not found' || response.status === 404
+                                            ? 'Contact not found. Please refresh the leads list (reload the page) and try again.'
+                                            : (result.error || result.reason || 'Failed to send photo');
+                                          alert(`❌ ${msg}`);
                                         }
                                       } catch (err) {
                                         alert('❌ Failed to send photo');
@@ -1971,6 +2004,79 @@ export default function SDRDashboardPage() {
                 </div>
               </div>
 
+              {/* Analysis & links to copy (for sending to clients) */}
+              {((selectedLead as any).personalized_message || (selectedLead as any).landing_page_url || (selectedLead as any).analysis_image_url || (selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url) && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-200/50 mb-4">
+                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <Copy className="w-5 h-5 text-emerald-600" />
+                    Analysis & links to copy
+                  </h3>
+                  <p className="text-xs text-gray-600 mb-3">Copy and send to the client.</p>
+                  <div className="space-y-2">
+                    {(selectedLead as any).personalized_message && (
+                      <div className="flex items-start gap-2 bg-white/90 rounded-lg p-3 border border-emerald-100">
+                        <p className="text-sm text-gray-700 flex-1 whitespace-pre-wrap min-w-0">{(selectedLead as any).personalized_message}</p>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await copyToClipboard((selectedLead as any).personalized_message);
+                            if (ok) { setCopiedId('analysis'); setTimeout(() => setCopiedId(null), 2000); } else { alert('Copy failed'); }
+                          }}
+                          className="shrink-0 px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs font-medium flex items-center gap-1"
+                        >
+                          {copiedId === 'analysis' ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedId === 'analysis' ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    )}
+                    {[
+                      { id: 'landing', label: 'Landing page', url: (selectedLead as any).landing_page_url },
+                      { id: 'analysis_img', label: 'Analysis image', url: (selectedLead as any).analysis_image_url },
+                      { id: 'report', label: 'Report', url: (selectedLead as any).report_url },
+                      { id: 'pdf', label: 'PDF', url: (selectedLead as any).pdf_url },
+                      { id: 'drive', label: 'Drive', url: (selectedLead as any).drive_url },
+                      { id: 'mockup', label: 'Mockup', url: (selectedLead as any).mockup_url },
+                    ].filter((x) => x.url).map(({ id, label, url }) => (
+                      <div key={id} className="flex items-center gap-2 bg-white/90 rounded-lg px-3 py-2 border border-emerald-100">
+                        <ExternalLink className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1 min-w-0">{url}</a>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await copyToClipboard(url);
+                            if (ok) { setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); } else { alert('Copy failed'); }
+                          }}
+                          className="shrink-0 px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs font-medium flex items-center gap-1"
+                        >
+                          {copiedId === id ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedId === id ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {((selectedLead as any).personalized_message || (selectedLead as any).landing_page_url || (selectedLead as any).analysis_image_url) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const parts: string[] = [];
+                        if ((selectedLead as any).personalized_message) parts.push((selectedLead as any).personalized_message);
+                        const links: string[] = [];
+                        if ((selectedLead as any).landing_page_url) links.push((selectedLead as any).landing_page_url);
+                        if ((selectedLead as any).analysis_image_url) links.push((selectedLead as any).analysis_image_url);
+                        if ((selectedLead as any).report_url) links.push((selectedLead as any).report_url);
+                        if (links.length) parts.push(links.join('\n'));
+                        const ok = await copyToClipboard(parts.join('\n\n'));
+                        if (ok) { setCopiedId('all'); setTimeout(() => setCopiedId(null), 2000); } else { alert('Copy failed'); }
+                      }}
+                      className="mt-3 w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-semibold flex items-center justify-center gap-2"
+                    >
+                      {copiedId === 'all' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {copiedId === 'all' ? 'Copied' : 'Copy analysis + all links'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Lead Gen Tool Data - Reports & Analysis */}
               {((selectedLead as any).report_url || (selectedLead as any).pdf_url || (selectedLead as any).drive_url || (selectedLead as any).mockup_url || (selectedLead as any).personalized_message || (selectedLead as any).dor_especifica) && (
                 <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200/50">
@@ -2132,8 +2238,8 @@ export default function SDRDashboardPage() {
                       {(selectedLead as any).email_validation && typeof (selectedLead as any).email_validation === 'object' && (
                         <div className="mt-2">
                           <span className="text-gray-600 font-medium text-xs">Email validation: </span>
-                          <pre className="text-xs bg-gray-100 p-2 rounded mt-0.5 overflow-x-auto max-h-24 overflow-y-auto">
-                            {JSON.stringify((selectedLead as any).email_validation, null, 2)}
+                          <pre className="text-xs bg-gray-100 p-2 rounded mt-0.5 overflow-x-auto max-h-24 overflow-y-auto whitespace-pre-wrap">
+                            {formatObjectAsText((selectedLead as any).email_validation)}
                           </pre>
                         </div>
                       )}
@@ -2173,8 +2279,8 @@ export default function SDRDashboardPage() {
                       {(selectedLead as any).audit_results && Object.keys((selectedLead as any).audit_results).length > 0 && (
                         <div>
                           <p className="text-xs text-gray-500 mb-2 font-semibold">Audit results</p>
-                          <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
-                            {JSON.stringify((selectedLead as any).audit_results, null, 2)}
+                          <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap">
+                            {formatObjectAsText((selectedLead as any).audit_results)}
                           </pre>
                         </div>
                       )}
@@ -2351,7 +2457,7 @@ export default function SDRDashboardPage() {
                               <p className="text-white/80"><span className="text-blue-300">Contact:</span> {leadGenDetailData.enrichment.contact_name}</p>
                             )}
                             {leadGenDetailData.enrichment.whatsapp_phone && (
-                              <p className="text-white/80"><span className="text-blue-300">WhatsApp:</span> {typeof leadGenDetailData.enrichment.whatsapp_phone === 'string' ? leadGenDetailData.enrichment.whatsapp_phone : JSON.stringify(leadGenDetailData.enrichment.whatsapp_phone)}</p>
+                              <p className="text-white/80"><span className="text-blue-300">WhatsApp:</span> {typeof leadGenDetailData.enrichment.whatsapp_phone === 'string' ? leadGenDetailData.enrichment.whatsapp_phone : formatObjectAsText(leadGenDetailData.enrichment.whatsapp_phone)}</p>
                             )}
                             <p className="text-white/80">
                               <span className="text-blue-300">Contact Page:</span> {leadGenDetailData.enrichment.has_contact_page ? 'Yes' : 'No'}
@@ -2365,9 +2471,9 @@ export default function SDRDashboardPage() {
                             {leadGenDetailData.enrichment.email_validation && (
                               <>
                                 <p className="text-white/80 mt-2"><span className="text-blue-300">Email validation:</span></p>
-                                <pre className={"text-xs text-white/70 mt-0.5 bg-black/20 p-2 rounded overflow-x-auto max-h-20 overflow-y-auto"}>
+                                <pre className="text-xs text-white/70 mt-0.5 bg-black/20 p-2 rounded overflow-x-auto max-h-20 overflow-y-auto whitespace-pre-wrap">
                                   {typeof leadGenDetailData.enrichment.email_validation === 'object'
-                                    ? JSON.stringify(leadGenDetailData.enrichment.email_validation, null, 2)
+                                    ? formatObjectAsText(leadGenDetailData.enrichment.email_validation)
                                     : String(leadGenDetailData.enrichment.email_validation)}
                                 </pre>
                               </>
@@ -2420,8 +2526,8 @@ export default function SDRDashboardPage() {
                         {leadGenDetailData.audit?.audit_results && Object.keys(leadGenDetailData.audit.audit_results).length > 0 && (
                           <div>
                             <p className="text-white/50 text-xs mb-1">Audit results</p>
-                            <pre className={"text-xs text-white/70 bg-black/20 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto"}>
-                              {JSON.stringify(leadGenDetailData.audit.audit_results, null, 2)}
+                            <pre className="text-xs text-white/70 bg-black/20 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+                              {formatObjectAsText(leadGenDetailData.audit.audit_results)}
                             </pre>
                           </div>
                         )}
@@ -2896,7 +3002,9 @@ export default function SDRDashboardPage() {
                       const result = await response.json();
 
                       if (response.ok && result.success) {
-                        alert('✅ WhatsApp message sent successfully!');
+                        alert(result.queued
+                          ? '✅ Message queued for delivery. Run the WhatsApp worker (npm run whatsapp-worker) to send with human-like delays.'
+                          : '✅ WhatsApp message sent successfully!');
                         setShowWhatsAppModal(false);
                         setWhatsappLead(null);
                         setWhatsappMessage('');
@@ -2907,7 +3015,10 @@ export default function SDRDashboardPage() {
                           loadDashboardData(token);
                         }
                       } else {
-                        alert(`❌ ${result.error || result.reason || 'Failed to send WhatsApp message'}`);
+                        const msg = result.error === 'Contact not found' || response.status === 404
+                          ? 'Contact not found. Please refresh the leads list (reload the page) and try again.'
+                          : (result.error || result.reason || 'Failed to send WhatsApp message');
+                        alert(`❌ ${msg}`);
                       }
                     } catch (err) {
                       alert('❌ Failed to send WhatsApp message');

@@ -212,88 +212,57 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Process contacts - actually send WhatsApp messages
-    const { sendWhatsAppMessage } = await import('@/lib/whatsapp-sending-service');
-    const { calculateDelay, shouldTakeBreak } = await import('@/lib/human-behavior-service');
-    
+    // Enqueue contacts for the WhatsApp worker (sends with human-like delays and breaks)
+    const { enqueueWhatsAppSend } = await import('@/lib/whatsapp-queue-service');
+
     const processed = readyContacts.length;
     const remainingDaily = settings.dailyLimit - dailyCount;
     const canProcess = Math.min(processed, remainingDaily);
-    
-    const results = [];
-    let messagesSent = 0;
-    let skipped = 0;
-    
-    // Process contacts with human behavior delays
-    for (let i = 0; i < canProcess && i < readyContacts.length; i++) {
-      const contact = readyContacts[i];
-      
-      // Check for breaks
-      if (messagesSent > 0) {
-        const breakCheck = shouldTakeBreak(messagesSent, settings);
-        if (breakCheck.shouldBreak) {
-          // In a real implementation, we'd pause here
-          // For now, we'll just log it
-          console.log(`[Outreach Process] Break needed: ${breakCheck.breakType} (${breakCheck.duration}s)`);
-        }
-      }
-      
-      // Calculate delay (for logging - actual delay would be applied in real sending)
-      const delay = calculateDelay(messagesSent, settings);
-      
-      // Send WhatsApp message
-      const sendResult = await sendWhatsAppMessage({
+    const toQueue = readyContacts.slice(0, canProcess);
+
+    const results: { contactId: string; nome: string; empresa: string; phone: string; status: string; queueId?: string; error?: string }[] = [];
+    let queued = 0;
+
+    for (const contact of toQueue) {
+      const enqueueResult = await enqueueWhatsAppSend({
         contactId: contact.id,
         sdrId: sdrId || contact.assigned_sdr_id || undefined,
         messageText: contact.personalized_message || '',
-        settings,
-        skipChecks: false, // Apply all checks
+        includeImages: true,
+        sentBySystem: true,
       });
-      
-      if (sendResult.success) {
-        messagesSent++;
+
+      if (enqueueResult.success) {
+        queued++;
         results.push({
           contactId: contact.id,
           nome: contact.nome,
           empresa: contact.empresa,
           phone: contact.phone,
-          status: 'sent',
-          whatsappSendId: sendResult.whatsappSendId,
-        });
-      } else if (sendResult.skipped) {
-        skipped++;
-        results.push({
-          contactId: contact.id,
-          nome: contact.nome,
-          empresa: contact.empresa,
-          phone: contact.phone,
-          status: 'skipped',
-          reason: sendResult.skipReason,
+          status: 'queued',
+          queueId: enqueueResult.queueId,
         });
       } else {
-        skipped++;
         results.push({
           contactId: contact.id,
           nome: contact.nome,
           empresa: contact.empresa,
           phone: contact.phone,
           status: 'failed',
-          error: sendResult.error,
+          error: enqueueResult.error,
         });
       }
-      
-      // In a real implementation, we'd apply the delay here
-      // For now, we'll just continue (cron job will handle spacing)
     }
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${readyContacts.length} contacts: ${messagesSent} sent, ${skipped} skipped`,
-      processed: messagesSent,
-      skipped: skipped + (contacts.length - processed),
-      dailyCount: dailyCount + messagesSent,
+      message: `${queued} message(s) queued for delivery. Run the WhatsApp worker (npm run whatsapp-worker) to send with human-like delays and breaks.`,
+      processed: 0,
+      queued,
+      skipped: contacts.length - toQueue.length,
+      dailyCount,
       dailyLimit: settings.dailyLimit,
-      remainingDaily: settings.dailyLimit - (dailyCount + messagesSent),
+      remainingDaily: settings.dailyLimit - dailyCount,
       results,
     });
   } catch (error) {
