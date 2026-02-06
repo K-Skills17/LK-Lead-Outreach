@@ -51,12 +51,11 @@ import type {
   LeadGenSalesPerformanceView,
 } from './leadGenSupabase';
 
-// Re-export functions
+// Re-export functions (getLeadGenTableAccess is defined and exported below)
 export {
   leadGenSupabase,
   isLeadGenDatabaseConfigured,
   testLeadGenConnection,
-  getLeadGenTableAccess,
 };
 
 // Re-export types
