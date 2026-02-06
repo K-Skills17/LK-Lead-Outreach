@@ -32,13 +32,25 @@ export interface QueueItem {
 }
 
 /**
+ * Default country code when number has no country code (e.g. Brazil).
+ */
+const DEFAULT_COUNTRY_CODE = '55';
+
+/**
  * Normalize phone for WhatsApp Web: digits only, with country code (e.g. 5511999999999).
  * WhatsApp id format: 5511999999999@c.us
+ * If number has 10–11 digits and no leading country code, prepends DEFAULT_COUNTRY_CODE (55).
  */
 export function normalizePhoneForWhatsApp(phone: string): string {
   const digits = phone.replace(/\D/g, '');
-  if (digits.length >= 10) return digits;
-  return phone.replace(/\D/g, '');
+  if (!digits.length) return phone;
+  // Already has country code (e.g. 55 for Brazil, 1 for US) – assume 2–3 digit prefix
+  if (digits.length >= 12) return digits;
+  // 10–11 digits: likely local format (e.g. 11 99999-9999) – add Brazil code
+  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith(DEFAULT_COUNTRY_CODE)) {
+    return DEFAULT_COUNTRY_CODE + digits;
+  }
+  return digits;
 }
 
 /**
@@ -99,6 +111,7 @@ export async function enqueueWhatsAppSend(
       .single();
 
     if (contactError || !contact) {
+      console.warn('[WhatsApp Queue] Contact not found:', contactId, contactError?.code ?? contactError?.message);
       return { success: false, error: 'Contact not found' };
     }
 
@@ -134,8 +147,11 @@ export async function enqueueWhatsAppSend(
     }
 
     if (!leadPhone) {
+      console.warn('[WhatsApp Queue] No phone for contact:', contactId, { phone: contact.phone, whatsapp_phone: (contact as any).whatsapp_phone, potential: (contact as any).potential_whatsapp_numbers });
       return { success: false, error: 'Contact has no phone number (phone, whatsapp_phone, or potential_whatsapp_numbers)' };
     }
+
+    const normalizedPhone = normalizePhoneForWhatsApp(leadPhone);
 
     let finalMessage = contact.personalized_message || messageText;
     if (includeImages) {
@@ -162,7 +178,7 @@ export async function enqueueWhatsAppSend(
       .from('whatsapp_send_queue')
       .insert({
         campaign_contact_id: contact.id,
-        lead_phone: leadPhone,
+        lead_phone: normalizedPhone,
         lead_name: contact.nome,
         lead_company: contact.empresa,
         message_text: finalMessage,
