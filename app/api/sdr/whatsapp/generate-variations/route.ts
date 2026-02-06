@@ -79,6 +79,24 @@ export async function POST(request: NextRequest) {
       opportunities = contact.opportunities;
     }
 
+    // Build audit/GPB summary for AI (use when crafting messages for leads that have this data)
+    let auditSummary: string | undefined;
+    const rating = (contact as any).rating;
+    const reviews = (contact as any).reviews;
+    const gpbScore = (contact as any).gpb_completeness_score;
+    const auditResults = (contact as any).audit_results;
+    if (rating != null || reviews != null || gpbScore != null || (auditResults && typeof auditResults === 'object')) {
+      const parts: string[] = [];
+      if (rating != null) parts.push(`Rating ${rating}/5`);
+      if (reviews != null) parts.push(`${reviews} reviews`);
+      if (gpbScore != null) parts.push(`GPB ${gpbScore}/100`);
+      if (auditResults && typeof auditResults === 'object') {
+        const keys = Object.keys(auditResults).filter((k) => !/timeout|error/i.test(k));
+        if (keys.length > 0) parts.push(`Audit: ${keys.slice(0, 5).join(', ')}`);
+      }
+      auditSummary = parts.join('; ');
+    }
+
     // Build input from contact data
     const result = await generateWhatsAppVariations({
       contactId: contact.id,
@@ -99,9 +117,11 @@ export async function POST(request: NextRequest) {
       business_quality_tier: contact.business_quality_tier,
       seo_score: contact.seo_score,
       page_score: contact.page_score,
-      rating: contact.rating,
-      reviews: contact.reviews,
+      rating: rating ?? contact.rating,
+      reviews: reviews ?? contact.reviews,
       competitor_count: contact.competitor_count,
+      gpb_completeness_score: gpbScore ?? (contact as any).gpb_completeness_score ?? null,
+      audit_summary: auditSummary,
       enrichment_data: contact.enrichment_data as Record<string, unknown>,
       lead_gen_id: contact.lead_gen_id,
       sdr_name: sdr.name,

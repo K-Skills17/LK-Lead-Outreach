@@ -44,6 +44,10 @@ export interface WhatsAppVariationInput {
   rating?: number;
   reviews?: number;
   competitor_count?: number;
+  /** Google Business Profile completeness (0-100). Use with audit data to craft messages. */
+  gpb_completeness_score?: number | null;
+  /** Short summary of audit findings for AI context (e.g. "Rating 4.2/5, 12 reviews, GPB 65/100"). */
+  audit_summary?: string;
   enrichment_data?: Record<string, unknown>;
   // Lead Gen fields (populated from database)
   lead_gen_id?: string;
@@ -153,6 +157,22 @@ function mergeLeadGenIntoInput(
       merged.is_icp = lg.qualityScore.is_icp;
   }
 
+  if (lg.audit) {
+    const a = lg.audit as { rating?: number; review_count?: number; gpb_completeness_score?: number; audit_results?: Record<string, unknown> };
+    if (a.rating != null) merged.rating = a.rating;
+    if (a.review_count != null) merged.reviews = a.review_count;
+    if (a.gpb_completeness_score != null) merged.gpb_completeness_score = a.gpb_completeness_score;
+    if (a.audit_results && typeof a.audit_results === 'object') {
+      const parts: string[] = [];
+      if (a.rating != null) parts.push(`Rating ${a.rating}/5`);
+      if (a.review_count != null) parts.push(`${a.review_count} reviews`);
+      if (a.gpb_completeness_score != null) parts.push(`GPB completeness ${a.gpb_completeness_score}/100`);
+      const keys = Object.keys(a.audit_results).filter((k) => !/timeout|error/i.test(k));
+      if (keys.length > 0) parts.push(`Audit: ${keys.slice(0, 5).join(', ')}`);
+      merged.audit_summary = parts.join('; ');
+    }
+  }
+
   if (lg.report) {
     if (lg.report.pdf_url) merged.pdf_report_url = lg.report.pdf_url;
     if (lg.report.mockup_url) merged.mockup_url = lg.report.mockup_url;
@@ -199,6 +219,14 @@ function buildLeadContext(input: WhatsAppVariationInput): string {
   if (input.rating) metrics.push(`Rating: ${input.rating}/5${input.reviews ? ` (${input.reviews} reviews)` : ''}`);
   if (metrics.length > 0) {
     parts.push(`\nBUSINESS METRICS: ${metrics.join(' | ')}`);
+  }
+
+  if (input.gpb_completeness_score != null || input.audit_summary) {
+    parts.push('\nAUDIT & GOOGLE BUSINESS PROFILE (use this to personalize when present):');
+    if (input.gpb_completeness_score != null) parts.push(`- GPB completeness: ${input.gpb_completeness_score}/100`);
+    if (input.audit_summary) parts.push(`- Summary: ${input.audit_summary}`);
+    parts.push('- For leads WITH this data: reference their listing, rating, reviews, or gaps to show research.');
+    parts.push('- For leads WITHOUT this data: use a more generic but still professional message.');
   }
 
   if (input.competitors && input.competitors.length > 0) {
@@ -372,6 +400,8 @@ Rules:
 - Each variation: 120-180 words
 - Format: WhatsApp-friendly (use 3-4 appropriate emojis max)
 - Use ALL available data (metrics, competitors, pain points, opportunities)
+- When AUDIT & GOOGLE BUSINESS PROFILE data is present (rating, reviews, GPB score): reference it to show deep research (e.g. their Google listing, rating, reviews, completeness). Craft messages that feel specific to their business.
+- When audit/GPB data is NOT present: use a more generic but still professional and value-focused message. Do not invent metrics.
 - Reference specific findings to show deep research
 - Create urgency or curiosity to generate a reply
 - Include a strong CTA asking for engagement

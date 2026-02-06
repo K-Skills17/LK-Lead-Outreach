@@ -22,6 +22,8 @@ const sendWhatsAppSchema = z.object({
   messageText: z.string().optional(), // Optional - will use personalized_message if available
   skipChecks: z.boolean().optional().default(false), // For manual sends
   includeImages: z.boolean().optional().default(true), // Include analysis images and landing pages in message
+  /** Use this number instead of contact.phone (e.g. when user picks from potential_whatsapp_numbers). */
+  phoneOverride: z.string().optional(),
 });
 
 /**
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
       messageText: validated.messageText ?? '',
       includeImages: validated.includeImages !== false,
       sentBySystem: validated.skipChecks !== true && !isAdmin,
+      phoneOverride: validated.phoneOverride?.trim() || undefined,
     });
 
     if (!result.success) {

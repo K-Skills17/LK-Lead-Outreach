@@ -13,6 +13,8 @@ export interface EnqueueWhatsAppOptions {
   messageText?: string;
   includeImages?: boolean;
   sentBySystem?: boolean;
+  /** When set, use this number instead of resolving from contact (e.g. user picked from potential_whatsapp_numbers). */
+  phoneOverride?: string;
 }
 
 export interface QueueItem {
@@ -48,8 +50,32 @@ export function phoneToChatId(phone: string): string {
 }
 
 /**
+ * Resolve the best WhatsApp number from a contact (any number on file).
+ */
+function resolveLeadPhone(contact: {
+  phone?: string | null;
+  whatsapp_phone?: string | null;
+  potential_whatsapp_numbers?: string[] | null;
+}, phoneOverride?: string): string | null {
+  if (phoneOverride && phoneOverride.trim()) return phoneOverride.trim();
+  if (contact.phone && String(contact.phone).trim()) return String(contact.phone).trim();
+  const wp = (contact as any).whatsapp_phone;
+  if (wp != null) {
+    const s = typeof wp === 'string' ? wp : (wp?.number ?? wp?.phone ?? '');
+    if (String(s).trim()) return String(s).trim();
+  }
+  const arr = (contact as any).potential_whatsapp_numbers;
+  if (Array.isArray(arr) && arr.length > 0) {
+    const first = arr[0];
+    if (first && String(first).trim()) return String(first).trim();
+  }
+  return null;
+}
+
+/**
  * Enqueue a WhatsApp message for the worker to send.
  * Fetches contact, builds message (with optional image links), inserts into queue.
+ * Uses any number on file: phone, whatsapp_phone, or first of potential_whatsapp_numbers.
  */
 export async function enqueueWhatsAppSend(
   options: EnqueueWhatsAppOptions
@@ -61,12 +87,13 @@ export async function enqueueWhatsAppSend(
       messageText = '',
       includeImages = true,
       sentBySystem = true,
+      phoneOverride,
     } = options;
 
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('campaign_contacts')
       .select(
-        'id, nome, empresa, phone, assigned_sdr_id, campaign_id, personalized_message, analysis_image_url, landing_page_url, report_url'
+        'id, nome, empresa, phone, whatsapp_phone, potential_whatsapp_numbers, lead_gen_id, assigned_sdr_id, campaign_id, personalized_message, analysis_image_url, landing_page_url, report_url'
       )
       .eq('id', contactId)
       .single();
@@ -75,8 +102,39 @@ export async function enqueueWhatsAppSend(
       return { success: false, error: 'Contact not found' };
     }
 
-    if (!contact.phone) {
-      return { success: false, error: 'Contact has no phone number' };
+    let leadPhone = resolveLeadPhone(contact, phoneOverride);
+
+    // Fallback: numbers may exist only in Lead Gen (enrichment), not synced to campaign_contacts
+    if (!leadPhone) {
+      const leadGenId = (contact as any).lead_gen_id || contact.id;
+      try {
+        const { getCompleteLeadGenData, isLeadGenDatabaseConfigured } = await import('./lead-gen-db-service');
+        if (isLeadGenDatabaseConfigured()) {
+          const lg = await getCompleteLeadGenData(leadGenId);
+          if (lg) {
+            const merged: { phone?: string; whatsapp_phone?: string; potential_whatsapp_numbers?: string[] } = {};
+            if (lg.lead?.phone) merged.phone = lg.lead.phone;
+            const enr = lg.enrichment;
+            if (enr) {
+              const wp = typeof enr.whatsapp_phone === 'string' ? enr.whatsapp_phone : (enr as any).whatsapp_phone?.number;
+              if (wp) merged.whatsapp_phone = wp;
+              const allPhones = [
+                ...(Array.isArray((enr as any).all_phone_numbers) ? (enr as any).all_phone_numbers : []),
+                ...(Array.isArray((enr as any).phone_numbers) ? (enr as any).phone_numbers : []),
+                ...(wp ? [wp] : []),
+              ].filter(Boolean);
+              if (allPhones.length > 0) merged.potential_whatsapp_numbers = [...new Set(allPhones)];
+            }
+            leadPhone = resolveLeadPhone({ ...contact, ...merged }, phoneOverride);
+          }
+        }
+      } catch (e) {
+        console.warn('[WhatsApp Queue] Lead Gen fallback error:', e);
+      }
+    }
+
+    if (!leadPhone) {
+      return { success: false, error: 'Contact has no phone number (phone, whatsapp_phone, or potential_whatsapp_numbers)' };
     }
 
     let finalMessage = contact.personalized_message || messageText;
@@ -104,7 +162,7 @@ export async function enqueueWhatsAppSend(
       .from('whatsapp_send_queue')
       .insert({
         campaign_contact_id: contact.id,
-        lead_phone: contact.phone,
+        lead_phone: leadPhone,
         lead_name: contact.nome,
         lead_company: contact.empresa,
         message_text: finalMessage,

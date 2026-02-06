@@ -149,6 +149,8 @@ export default function SDRDashboardPage() {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState('');
+  /** When lead has multiple numbers, which one to send to (optional override). */
+  const [whatsappSelectedPhone, setWhatsappSelectedPhone] = useState<string | null>(null);
   const [includeImagesInWhatsApp, setIncludeImagesInWhatsApp] = useState(true);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [sendingState, setSendingState] = useState<any>(null);
@@ -1232,6 +1234,7 @@ export default function SDRDashboardPage() {
                                 <button
                                   onClick={() => {
                                     setWhatsappLead(lead);
+                                    setWhatsappSelectedPhone(null);
                                     // Pre-fill with personalized message if available, or default
                                     const defaultMessage = (lead as any).personalized_message || 
                                       `Olá ${lead.nome || 'Cliente'}! 👋\n\nVi que você trabalha na ${lead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\n${user?.name || 'Equipe LK Digital'}`;
@@ -2697,6 +2700,7 @@ export default function SDRDashboardPage() {
                     onClick={() => {
                       setShowLeadDetail(false);
                       setWhatsappLead(selectedLead);
+                      setWhatsappSelectedPhone(null);
                       const defaultMessage = (selectedLead as any).personalized_message || 
                         `Olá ${selectedLead.nome || 'Cliente'}! 👋\n\nVi que você trabalha na ${selectedLead.empresa || 'sua empresa'}.\n\nGostaria de uma conversa rápida para mostrar como podemos ajudar?\n\nAtenciosamente,\n${user?.name || 'Equipe LK Digital'}`;
                       setWhatsappMessage(defaultMessage);
@@ -2843,6 +2847,7 @@ export default function SDRDashboardPage() {
                   setShowWhatsAppModal(false);
                   setWhatsappLead(null);
                   setWhatsappMessage('');
+                  setWhatsappSelectedPhone(null);
                   setIncludeImagesInWhatsApp(true);
                   setWhatsappVariations([]);
                   setSelectedVariation(null);
@@ -2853,14 +2858,39 @@ export default function SDRDashboardPage() {
               </button>
             </div>
 
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
-                <strong>To:</strong> {whatsappLead.nome} ({whatsappLead.empresa}) - {whatsappLead.phone}
-              </p>
-              <p className="text-xs text-green-700 mt-1">
-                💬 Human-like manual sending - This message will be sent immediately
-              </p>
-            </div>
+            {(() => {
+              const phones: string[] = [];
+              if (whatsappLead.phone) phones.push(whatsappLead.phone);
+              const wp = (whatsappLead as any).whatsapp_phone;
+              if (wp) phones.push(typeof wp === 'string' ? wp : (wp?.number || wp?.phone || ''));
+              const pot = (whatsappLead as any).potential_whatsapp_numbers;
+              if (Array.isArray(pot)) pot.forEach((p: string) => p && !phones.includes(p) && phones.push(p));
+              const displayPhone = whatsappSelectedPhone || phones[0] || whatsappLead.phone || '';
+              return (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <strong>To:</strong> {whatsappLead.nome} ({whatsappLead.empresa}){displayPhone ? ` – ${displayPhone}` : ''}
+                  </p>
+                  {phones.length > 1 && (
+                    <div className="mt-2">
+                      <label className="text-xs text-green-700 font-medium block mb-1">Send to number:</label>
+                      <select
+                        value={whatsappSelectedPhone || phones[0] || ''}
+                        onChange={(e) => setWhatsappSelectedPhone(e.target.value || null)}
+                        className="text-sm border border-green-300 rounded-lg px-2 py-1.5 bg-white text-gray-800 w-full max-w-xs"
+                      >
+                        {phones.filter(Boolean).map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <p className="text-xs text-green-700 mt-1">
+                    💬 Message will be queued; worker sends with human-like delays.
+                  </p>
+                </div>
+              );
+            })()}
 
             <div className="space-y-4">
               {/* AI Variations Generator */}
@@ -2996,6 +3026,7 @@ export default function SDRDashboardPage() {
                           messageText: whatsappMessage,
                           skipChecks: true, // Manual send - skip all checks for human-like sending
                           includeImages: includeImagesInWhatsApp,
+                          phoneOverride: whatsappSelectedPhone || undefined,
                         }),
                       });
 
